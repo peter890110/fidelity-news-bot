@@ -1,4 +1,6 @@
 import os
+import re
+import base64
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -26,6 +28,21 @@ FEEDS = {
         "url": "https://news.google.com/rss/search?q=fed+OR+semiconductor+OR+nvidia+OR+earnings+OR+macro+market&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     }
 }
+
+def decode_google_news_url(url):
+    """Attempt to decode base64 encoded Google News URL to actual publisher URL."""
+    try:
+        if "news.google.com/rss/articles/" in url:
+            b64_str = url.split("articles/")[1].split("?")[0]
+            b64_str = b64_str.replace("-", "+").replace("_", "/")
+            b64_str += "=" * ((4 - len(b64_str) % 4) % 4)
+            decoded = base64.b64decode(b64_str)
+            match = re.search(rb'https?://[^\x00-\x1f"\'\s<>]+', decoded)
+            if match:
+                return match.group(0).decode('utf-8', errors='ignore')
+    except Exception:
+        pass
+    return url
 
 def parse_pub_date(date_str):
     """Parse Google News RSS pubDate string into a timezone-naive UTC datetime object."""
@@ -72,6 +89,7 @@ def fetch_feed_articles(feed_key, feed_info):
             
             title = title_elem.text if title_elem is not None else ""
             link = link_elem.text if link_elem is not None else ""
+            link = decode_google_news_url(link)
             pub_date_str = pub_date_elem.text if pub_date_elem is not None else ""
             source = source_elem.text if source_elem is not None else feed_info["name"]
             
