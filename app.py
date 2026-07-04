@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 import concurrent.futures
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
+from googlenewsdecoder import gnewsdecoder
 
 # Load env variables if .env exists
 load_dotenv()
@@ -33,13 +34,9 @@ def decode_google_news_url(url):
     """Attempt to decode base64 encoded Google News URL to actual publisher URL."""
     try:
         if "news.google.com/rss/articles/" in url:
-            b64_str = url.split("articles/")[1].split("?")[0]
-            b64_str = b64_str.replace("-", "+").replace("_", "/")
-            b64_str += "=" * ((4 - len(b64_str) % 4) % 4)
-            decoded = base64.b64decode(b64_str)
-            match = re.search(rb'https?://[^\x00-\x1f"\'\s<>]+', decoded)
-            if match:
-                return match.group(0).decode('utf-8', errors='ignore')
+            decoded = gnewsdecoder(url)
+            if decoded.get("status"):
+                return decoded["decoded_url"]
     except Exception:
         pass
     return url
