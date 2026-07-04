@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 財經新聞分析助理 - 盤前/盤後即時市場解碼</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Base Variables & Reset */
+        :root {
+            --bg-color: #08090d;
+            --card-bg: rgba(17, 22, 34, 0.65);
+            --card-border: rgba(255, 255, 255, 0.07);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-cyan: #00f2fe;
+            --accent-blue: #4facfe;
+            --accent-purple: #a855f7;
+            
+            --bullish-green: #10b981;
+            --bullish-bg: rgba(16, 185, 129, 0.1);
+            --bullish-border: rgba(16, 185, 129, 0.2);
+            --bearish-red: #ef4444;
+            --bearish-bg: rgba(239, 68, 68, 0.1);
+            --bearish-border: rgba(239, 68, 68, 0.2);
+            --neutral-yellow: #f59e0b;
+            --neutral-bg: rgba(245, 158, 11, 0.1);
+            --neutral-border: rgba(245, 158, 11, 0.2);
+            
+            --glow-cyan: rgba(0, 242, 254, 0.15);
+            --glow-blue: rgba(79, 172, 254, 0.15);
+            --glow-purple: rgba(168, 85, 247, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'SF Pro TC', 'Noto Sans TC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Backdrop Glowing Orbs */
+        .glow-orb-1 {
+            position: absolute;
+            top: -10%;
+            left: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, var(--glow-cyan) 0%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+            filter: blur(80px);
+        }
+
+        .glow-orb-2 {
+            position: absolute;
+            bottom: -10%;
+            right: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, var(--glow-purple) 0%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+            filter: blur(80px);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Header Styling */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            position: relative;
+        }
+
+        .logo-area h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 50%, var(--accent-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-area p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .action-group {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--bullish-green);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px var(--bullish-green);
+            animation: pulse 2s infinite;
+        }
+
+        .btn-icon {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-icon:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
+            transform: rotate(45deg);
+        }
+
+        /* Control Card */
+        .control-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 1.5rem;
+            align-items: flex-end;
+        }
+
+        @media (max-width: 768px) {
+            .control-card {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-card select, 
+        .control-card input {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            outline: none;
+            font-size: 0.9375rem;
+            font-family: inherit;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .control-card select:focus, 
+        .control-card input:focus {
+            border-color: var(--accent-cyan);
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            border: none;
+            color: #08090d;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
+            padding: 0.75rem 2rem;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            height: 46px;
+            box-shadow: 0 4px 20px rgba(0, 242, 254, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 242, 254, 0.45), 0 0 30px rgba(79, 172, 254, 0.2);
+            filter: brightness(1.05);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+        }
+
+        .btn-primary:disabled {
+            background: #27272a;
+            color: #71717a;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Loading Area */
+        .loading-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 3rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .loader-glow {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin-bottom: 2rem;
+        }
+
+        .loader-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            border-top-color: var(--accent-cyan);
+            border-bottom-color: var(--accent-purple);
+            animation: spin 1.5s linear infinite;
+        }
+
+        .loader-pulse {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            top: 10px;
+            left: 10px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 242, 254, 0.3) 0%, transparent 70%);
+            animation: pulse-grow 1.5s ease-in-out infinite alternate;
+        }
+
+        .loading-steps {
+            max-width: 400px;
+            width: 100%;
+            margin: 1.5rem auto 0 auto;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            opacity: 0.5;
+            transition: all 0.3s;
+        }
+
+        .step-item.active {
+            color: var(--text-primary);
+            opacity: 1;
+            font-weight: 500;
+        }
+
+        .step-item.completed {
+            color: var(--bullish-green);
+            opacity: 1;
+        }
+
+        .step-indicator {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.625rem;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .step-item.active .step-indicator {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 8px var(--accent-cyan);
+            background: var(--accent-cyan);
+            color: #08090d;
+        }
+
+        .step-item.completed .step-indicator {
+            border-color: var(--bullish-green);
+            background: var(--bullish-green);
+            color: #08090d;
+        }
+
+        /* Dashboard & Report Header */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .dashboard-header h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.5rem 1.25rem;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 15px rgba(79, 172, 254, 0.15);
+        }
+
+        /* News Cards Grid */
+        .news-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .news-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .news-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25), 0 0 20px rgba(0, 242, 254, 0.05);
+        }
+
+        /* Card Elements */
+        .card-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-container {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .category-badge {
+            background: rgba(168, 85, 247, 0.15);
+            color: #d8b4fe;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .source-badge {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-primary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+        }
+
+        .pub-date {
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .headline {
+            font-size: 1.25rem;
+            font-weight: 700;
+            line-height: 1.4;
+            color: #ffffff;
+            letter-spacing: -0.2px;
+        }
+
+        .info-subgrid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .info-subgrid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .impact-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .box-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+        }
+
+        .impact-text {
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: #e5e7eb;
+        }
+
+        .metric-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .metric-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-top: 0.25rem;
+        }
+
+        /* Signal bar */
+        .signal-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            margin-top: 0.25rem;
+        }
+
+        .signal-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 0.9375rem;
+            text-transform: uppercase;
+            padding: 0.35rem 0.85rem;
+            border-radius: 8px;
+        }
+
+        .signal-indicator.bullish {
+            color: var(--bullish-green);
+            background: var(--bullish-bg);
+            border: 1px solid var(--bullish-border);
+        }
+
+        .signal-indicator.bearish {
+            color: var(--bearish-red);
+            background: var(--bearish-bg);
+            border: 1px solid var(--bearish-border);
+        }
+
+        .signal-indicator.neutral {
+            color: var(--neutral-yellow);
+            background: var(--neutral-bg);
+            border: 1px solid var(--neutral-border);
+        }
+
+        .signal-reason {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-align: right;
+            flex: 1;
+            margin-left: 1.5rem;
+            font-weight: 500;
+        }
+
+        .card-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 1rem;
+            margin-top: 0.25rem;
+        }
+
+        .read-original {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: color 0.2s;
+        }
+
+        .read-original:hover {
+            color: var(--accent-cyan);
+            text-decoration: underline;
+        }
+
+        .btn-copy-card {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.8125rem;
+            font-family: inherit;
+            transition: color 0.2s;
+        }
+
+        .btn-copy-card:hover {
+            color: #ffffff;
+        }
+
+        /* Settings Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal {
+            background: #0f121d;
+            border: 1px solid var(--card-border);
+            width: 90%;
+            max-width: 500px;
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .btn-close:hover {
+            color: #ffffff;
+        }
+
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .password-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .password-container input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 0.75rem 2.5rem 0.75rem 1rem;
+            border-radius: 12px;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .password-container input:focus {
+            border-color: var(--accent-cyan);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .btn-toggle-pwd {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .btn-toggle-pwd:hover {
+            color: #ffffff;
+        }
+
+        .hint-text {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-top: -0.25rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Empty state */
+        .empty-state {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 4rem 2rem;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.25rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .empty-state svg {
+            color: var(--text-secondary);
+            opacity: 0.4;
+        }
+
+        .empty-state h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            max-width: 450px;
+            font-size: 0.9375rem;
+            line-height: 1.5;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(16, 22, 34, 0.9);
+            border: 1px solid var(--bullish-green);
+            color: #ffffff;
+            backdrop-filter: blur(12px);
+            padding: 0.85rem 1.75rem;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 600;
+            font-size: 0.9375rem;
+            z-index: 1000;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(16, 185, 129, 0.15);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.error-toast {
+            border-color: var(--bearish-red);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(239, 68, 68, 0.15);
+        }
+
+        /* Keyframe Animations */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.4;
+                transform: scale(0.9);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes pulse-grow {
+            to {
+                transform: scale(1.15);
+                opacity: 0.6;
+            }
+        }
+
+        @keyframes scale-up {
+            from {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glow-orb-1"></div>
+    <div class="glow-orb-2"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo-area">
+                <h1>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-cyan)"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    AI 財經新聞分析助理
+                </h1>
+                <p>盤前/盤後最新市場脈動與核心交易訊號解碼</p>
+            </div>
+            <div class="action-group">
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    市場連線中
+                </div>
+                <button class="btn-icon" id="btn-settings" title="設定 API 金鑰">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Control Center -->
+        <section class="control-card">
+            <div class="input-group">
+                <label for="select-timeframe">時間跨度</label>
+                <select id="select-timeframe">
+                    <option value="12" selected>過去 12 小時 (白天九點首選：美股收盤 & 盤前)</option>
+                    <option value="24">過去 24 小時</option>
+                    <option value="48">過去 48 小時</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="select-model">分析引擎</label>
+                <select id="select-model">
+                    <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (快速且高準確度 - 推薦)</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (深度分析)</option>
+                </select>
+            </div>
+            <button class="btn-primary" id="btn-fetch">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                獲取最新財經解析
+            </button>
+        </section>
+
+        <!-- Loading State -->
+        <section class="loading-container" id="loading-area">
+            <div class="loader-glow">
+                <div class="loader-ring"></div>
+                <div class="loader-pulse"></div>
+            </div>
+            <h3>正在調度分析助理...</h3>
+            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">這可能需要大約 15 - 30 秒，請稍候</p>
+            
+            <div class="loading-steps">
+                <div class="step-item" id="step-1">
+                    <div class="step-indicator">1</div>
+                    <span>連結《經濟日報》與《工商時報》即時新聞源...</span>
+                </div>
+                <div class="step-item" id="step-2">
+                    <div class="step-indicator">2</div>
+                    <span>下載美股、聯聯會、半導體與 AI 板塊重大訊息...</span>
+                </div>
+                <div class="step-item" id="step-3">
+                    <div class="step-indicator">3</div>
+                    <span>過濾時效，鎖定高價值市場驅動故事...</span>
+                </div>
+                <div class="step-item" id="step-4">
+                    <div class="step-indicator">4</div>
+                    <span>啟動 Gemini AI 模型解析標的影響與趨勢強度...</span>
+                </div>
+                <div class="step-item" id="step-5">
+                    <div class="step-indicator">5</div>
+                    <span>構建交易信號，輸出繁體中文分析成果...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Area -->
+        <main id="results-area" style="display: none;">
+            <div class="dashboard-header">
+                <h2 id="report-title">最優市場重大驅動新聞</h2>
+                <button class="btn-secondary" id="btn-copy-all">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    複製完整分析報告
+                </button>
+            </div>
+
+            <div class="news-grid" id="news-container">
+                <!-- Dynamically generated news cards will be appended here -->
+            </div>
+        </main>
+
+        <!-- Empty State -->
+        <section class="empty-state" id="empty-area">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+            <h3>尚未產生分析報告</h3>
+            <p>請確認您的設定中已填寫 Gemini API Key，然後點擊上方「獲取最新財經解析」按鈕，獲取即時的市場影響評估。</p>
+        </section>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>分析助理金鑰設定</h3>
+                <button class="btn-close" id="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="input-api-key">Gemini API Key</label>
+                    <div class="password-container">
+                        <input type="password" id="input-api-key" placeholder="輸入 AIzaSy... 開頭的 Gemini API 金鑰">
+                        <button class="btn-toggle-pwd" id="btn-toggle-key" type="button">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                    <p class="hint-text">此金鑰將安全地儲存在您本地瀏覽器的 LocalStorage 中，不會上傳給其他第三方。</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-cancel-settings">取消</button>
+                <button class="btn-primary" id="btn-save-settings" style="height: auto; padding: 0.65rem 1.5rem;">儲存金鑰</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast" id="toast-message">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <span id="toast-text">報告已成功複製！</span>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Global variables and state
+        let newsData = [];
+        const elements = {
+            btnSettings: document.getElementById('btn-settings'),
+            btnCloseModal: document.getElementById('btn-close-modal'),
+            btnCancelSettings: document.getElementById('btn-cancel-settings'),
+            btnSaveSettings: document.getElementById('btn-save-settings'),
+            btnToggleKey: document.getElementById('btn-toggle-key'),
+            settingsModal: document.getElementById('settings-modal'),
+            inputApiKey: document.getElementById('input-api-key'),
+            selectTimeframe: document.getElementById('select-timeframe'),
+            selectModel: document.getElementById('select-model'),
+            btnFetch: document.getElementById('btn-fetch'),
+            loadingArea: document.getElementById('loading-area'),
+            resultsArea: document.getElementById('results-area'),
+            emptyArea: document.getElementById('empty-area'),
+            newsContainer: document.getElementById('news-container'),
+            btnCopyAll: document.getElementById('btn-copy-all'),
+            toast: document.getElementById('toast-message'),
+            toastText: document.getElementById('toast-text'),
+            reportTitle: document.getElementById('report-title')
+        };
+
+        // Initialize Settings from LocalStorage
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedKey = localStorage.getItem('GEMINI_API_KEY');
+            if (savedKey) {
+                elements.inputApiKey.value = savedKey;
+            }
+            
+            const savedModel = localStorage.getItem('GEMINI_API_MODEL');
+            if (savedModel) {
+                elements.selectModel.value = savedModel;
+            }
+        });
+
+        // Toggle Modal Visibility
+        elements.btnSettings.addEventListener('click', () => {
+            elements.settingsModal.style.display = 'flex';
+        });
+
+        const closeModal = () => {
+            elements.settingsModal.style.display = 'none';
+        };
+
+        elements.btnCloseModal.addEventListener('click', closeModal);
+        elements.btnCancelSettings.addEventListener('click', closeModal);
+        
+        // Save Settings
+        elements.btnSaveSettings.addEventListener('click', () => {
+            const keyVal = elements.inputApiKey.value.trim();
+            const modelVal = elements.selectModel.value;
+            
+            if (keyVal) {
+                localStorage.setItem('GEMINI_API_KEY', keyVal);
+            } else {
+                localStorage.removeItem('GEMINI_API_KEY');
+            }
+            localStorage.setItem('GEMINI_API_MODEL', modelVal);
+            
+            showToast('設定已成功儲存！', false);
+            closeModal();
+        });
+
+        // Toggle Key Visibility
+        elements.btnToggleKey.addEventListener('click', () => {
+            if (elements.inputApiKey.type === 'password') {
+                elements.inputApiKey.type = 'text';
+                elements.btnToggleKey.style.color = 'var(--accent-cyan)';
+            } else {
+                elements.inputApiKey.type = 'password';
+                elements.btnToggleKey.style.color = 'var(--text-secondary)';
+            }
+        });
+
+        // Toast Helper
+        function showToast(text, isError = false) {
+            elements.toastText.textContent = text;
+            if (isError) {
+                elements.toast.classList.add('error-toast');
+                // Change icon to warning
+                elements.toast.querySelector('svg').innerHTML = '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>';
+                elements.toast.querySelector('svg').style.color = 'var(--bearish-red)';
+            } else {
+                elements.toast.classList.remove('error-toast');
+                // Change icon to check
+                elements.toast.querySelector('svg').innerHTML = '<path d="M20 6 9 17l-5-5"/>';
+                elements.toast.querySelector('svg').style.color = 'var(--bullish-green)';
+            }
+            
+            elements.toast.classList.add('show');
+            setTimeout(() => {
+                elements.toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Fetch & Analyze News
+        elements.btnFetch.addEventListener('click', async () => {
+            const apiKey = localStorage.getItem('GEMINI_API_KEY') || elements.inputApiKey.value.trim();
+            const model = elements.selectModel.value;
+            const hours = elements.selectTimeframe.value;
+
+            if (!apiKey) {
+                showToast('請先設定您的 Gemini API Key！', true);
+                elements.settingsModal.style.display = 'flex';
+                return;
+            }
+
+            // UI transition to loading
+            elements.emptyArea.style.display = 'none';
+            elements.resultsArea.style.display = 'none';
+            elements.loadingArea.style.display = 'flex';
+            elements.btnFetch.disabled = true;
+
+            // Reset loading steps
+            const steps = [1, 2, 3, 4, 5];
+            steps.forEach(i => {
+                const step = document.getElementById(`step-${i}`);
+                step.className = 'step-item';
+            });
+
+            // Simulate progress tracker increments while waiting for network
+            let currentStep = 1;
+            const updateStepsInterval = setInterval(() => {
+                if (currentStep <= 5) {
+                    const activeStep = document.getElementById(`step-${currentStep}`);
+                    if (activeStep) {
+                        activeStep.className = 'step-item active';
+                        if (currentStep > 1) {
+                            const prevStep = document.getElementById(`step-${currentStep - 1}`);
+                            if (prevStep) prevStep.className = 'step-item completed';
+                        }
+                    }
+                    currentStep++;
+                }
+            }, 3500);
+
+            try {
+                const response = await fetch('/api/news', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        api_key: apiKey,
+                        model: model,
+                        hours: hours
+                    })
+                });
+
+                clearInterval(updateStepsInterval);
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || `HTTP 錯誤 ${response.status}`);
+                }
+
+                const data = await response.json();
+                newsData = data;
+
+                if (!newsData.post_market_reports && !newsData.news_headlines) {
+                    throw new Error('未篩選出符合條件的重大新聞。');
+                }
+
+                // Show results
+                renderResults(hours);
+                
+                // Set all loader steps to completed
+                steps.forEach(i => {
+                    const step = document.getElementById(`step-${i}`);
+                    step.className = 'step-item completed';
+                });
+                
+                setTimeout(() => {
+                    elements.loadingArea.style.display = 'none';
+                    elements.resultsArea.style.display = 'block';
+                    elements.btnFetch.disabled = false;
+                }, 500);
+
+            } catch (err) {
+                clearInterval(updateStepsInterval);
+                console.error(err);
+                showToast(err.message, true);
+                
+                elements.loadingArea.style.display = 'none';
+                elements.emptyArea.style.display = 'flex';
+                elements.btnFetch.disabled = false;
+            }
+        });
+
+        // Render Results
+        function renderResults(hours) {
+            elements.newsContainer.innerHTML = '';
+            elements.reportTitle.textContent = `精選今日 ${hours} 小時內重大驅動新聞`;
+
+            // Render Post-Market Report
+            if (newsData.post_market_reports && newsData.post_market_reports.length > 0) {
+                const pmCard = document.createElement('article');
+                pmCard.className = 'news-card';
+                let pmHtml = `<div class="badge-container" style="margin-bottom: 1rem;"><span class="category-badge">Post-market Report</span></div>`;
+                
+                newsData.post_market_reports.forEach(report => {
+                    pmHtml += `<h3 class="headline" style="margin-top: 1rem;">◼ ${report.title}</h3>`;
+                    pmHtml += `<ul style="color: #e5e7eb; padding-left: 1.5rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">`;
+                    if (report.bullet_points) {
+                        report.bullet_points.forEach(point => {
+                            pmHtml += `<li>${point}</li>`;
+                        });
+                    }
+                    pmHtml += `</ul>`;
+                });
+                pmCard.innerHTML = pmHtml;
+                elements.newsContainer.appendChild(pmCard);
+            }
+
+            // Render News Headlines
+            if (newsData.news_headlines && newsData.news_headlines.length > 0) {
+                const nhCard = document.createElement('article');
+                nhCard.className = 'news-card';
+                let nhHtml = `<div class="badge-container" style="margin-bottom: 1rem;"><span class="category-badge">News Headlines</span></div>`;
+                
+                // Group by source
+                const grouped = {};
+                newsData.news_headlines.forEach(news => {
+                    if (!grouped[news.source]) grouped[news.source] = [];
+                    grouped[news.source].push(news);
+                });
+
+                for (const [source, articles] of Object.entries(grouped)) {
+                    nhHtml += `<h3 class="headline" style="margin-top: 1.25rem; font-size: 1.15rem; color: var(--accent-cyan);">◼ ${source}</h3>`;
+                    articles.forEach(art => {
+                        nhHtml += `<div style="margin-top: 1rem; margin-left: 1rem;">`;
+                        nhHtml += `<div style="color: #ffffff; font-weight: 600; margin-bottom: 0.5rem;">- ${art.headline}</div>`;
+                        nhHtml += `<ol style="color: #e5e7eb; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.25rem;">`;
+                        if (art.numbered_points) {
+                            art.numbered_points.forEach(point => {
+                                nhHtml += `<li>${point}</li>`;
+                            });
+                        }
+                        nhHtml += `</ol>`;
+                        nhHtml += `<a href="${art.link}" target="_blank" class="read-original" style="margin-top: 0.75rem;">查看原始新聞網頁 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
+                        nhHtml += `</div>`;
+                    });
+                }
+                nhCard.innerHTML = nhHtml;
+                elements.newsContainer.appendChild(nhCard);
+            }
+        }
+
+        // Generate Formatted Text Report
+        function generateReportText(data) {
+            let text = "";
+            
+            if (data.post_market_reports && data.post_market_reports.length > 0) {
+                text += "[Post-market Report]\n";
+                data.post_market_reports.forEach(report => {
+                    text += `◼ ${report.title}\n`;
+                    if (report.bullet_points) {
+                        report.bullet_points.forEach(point => {
+                            text += `  - ${point}\n`;
+                        });
+                    }
+                    text += "\n";
+                });
+            }
+
+            if (data.news_headlines && data.news_headlines.length > 0) {
+                text += "[News Headlines]\n";
+                const grouped = {};
+                data.news_headlines.forEach(news => {
+                    if (!grouped[news.source]) grouped[news.source] = [];
+                    grouped[news.source].push(news);
+                });
+
+                for (const [source, articles] of Object.entries(grouped)) {
+                    text += `◼ ${source}\n`;
+                    articles.forEach(art => {
+                        text += `  - ${art.headline}\n`;
+                        if (art.numbered_points) {
+                            art.numbered_points.forEach((point, idx) => {
+                                text += `  ${idx + 1}. ${point}\n`;
+                            });
+                        }
+                    });
+                    text += "\n";
+                }
+            }
+            return text.trim();
+        }
+
+        // Copy All Report
+        elements.btnCopyAll.addEventListener('click', () => {
+            if (!newsData) return;
+            const fullReport = generateReportText(newsData);
+            
+            navigator.clipboard.writeText(fullReport).then(() => {
+                showToast('已複製完整分析報告到剪貼簿！');
+            }).catch(err => {
+                console.error('複製失敗:', err);
+                showToast('複製失敗，請手動選取複製。', true);
+            });
+        });
+    </script>
+</body>
+</html>
