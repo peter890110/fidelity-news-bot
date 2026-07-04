@@ -1,6 +1,5 @@
-Flask==2.0.3
-requests==2.32.5
-python-dotenv==1.0.0
-Werkzeug==2.0.3
+Flask
+requests
+python-dotenv
 gunicorn
 setuptools
