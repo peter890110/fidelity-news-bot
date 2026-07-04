@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import base64
 import requests
 import xml.etree.ElementTree as ET
@@ -86,7 +87,6 @@ def fetch_feed_articles(feed_key, feed_info):
             
             title = title_elem.text if title_elem is not None else ""
             link = link_elem.text if link_elem is not None else ""
-            link = decode_google_news_url(link)
             pub_date_str = pub_date_elem.text if pub_date_elem is not None else ""
             source = source_elem.text if source_elem is not None else feed_info["name"]
             
@@ -313,6 +313,18 @@ def get_news():
                 return jsonify({"error": "Gemini API 未回傳任何候選結果"}), 502
             
             content_text = candidates[0]["content"]["parts"][0]["text"]
+            
+            # Post-process: Decode only the URLs chosen by Gemini to save time
+            try:
+                result_data = json.loads(content_text)
+                if "news_headlines" in result_data:
+                    for article in result_data["news_headlines"]:
+                        orig_link = article.get("link", "")
+                        if orig_link:
+                            article["link"] = decode_google_news_url(orig_link)
+                content_text = json.dumps(result_data, ensure_ascii=False)
+            except Exception as e:
+                print(f"Error decoding URLs in JSON: {e}")
             
             # The API returns structured JSON based on our responseSchema
             return content_text, 200, {'Content-Type': 'application/json'}
