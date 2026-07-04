@@ -1075,11 +1075,7 @@
             const model = elements.selectModel.value;
             const hours = elements.selectTimeframe.value;
 
-            if (!apiKey) {
-                showToast('請先設定您的 Gemini API Key！', true);
-                elements.settingsModal.style.display = 'flex';
-                return;
-            }
+           
 
             // UI transition to loading
             elements.emptyArea.style.display = 'none';
