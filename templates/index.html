@@ -1075,7 +1075,7 @@
             const model = elements.selectModel.value;
             const hours = elements.selectTimeframe.value;
 
-           
+            // Backend will handle API key validation via environment variable if none provided
 
             // UI transition to loading
             elements.emptyArea.style.display = 'none';
@@ -1129,7 +1129,7 @@
                 const data = await response.json();
                 newsData = data;
 
-                if (!newsData.post_market_reports && !newsData.news_headlines) {
+                if (!newsData.taiwan_market && !newsData.us_market) {
                     throw new Error('未篩選出符合條件的重大新聞。');
                 }
 
@@ -1164,98 +1164,116 @@
             elements.newsContainer.innerHTML = '';
             elements.reportTitle.textContent = `精選今日 ${hours} 小時內重大驅動新聞`;
 
-            // Render Post-Market Report
-            if (newsData.post_market_reports && newsData.post_market_reports.length > 0) {
-                const pmCard = document.createElement('article');
-                pmCard.className = 'news-card';
-                let pmHtml = `<div class="badge-container" style="margin-bottom: 1rem;"><span class="category-badge">Post-market Report</span></div>`;
-                
-                newsData.post_market_reports.forEach(report => {
-                    pmHtml += `<h3 class="headline" style="margin-top: 1rem;">◼ ${report.title}</h3>`;
-                    pmHtml += `<ul style="color: #e5e7eb; padding-left: 1.5rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">`;
-                    if (report.bullet_points) {
-                        report.bullet_points.forEach(point => {
-                            pmHtml += `<li>${point}</li>`;
-                        });
-                    }
-                    pmHtml += `</ul>`;
-                });
-                pmCard.innerHTML = pmHtml;
-                elements.newsContainer.appendChild(pmCard);
-            }
-
-            // Render News Headlines
-            if (newsData.news_headlines && newsData.news_headlines.length > 0) {
-                const nhCard = document.createElement('article');
-                nhCard.className = 'news-card';
-                let nhHtml = `<div class="badge-container" style="margin-bottom: 1rem;"><span class="category-badge">News Headlines</span></div>`;
-                
-                // Group by source
-                const grouped = {};
-                newsData.news_headlines.forEach(news => {
-                    if (!grouped[news.source]) grouped[news.source] = [];
-                    grouped[news.source].push(news);
-                });
-
-                for (const [source, articles] of Object.entries(grouped)) {
-                    nhHtml += `<h3 class="headline" style="margin-top: 1.25rem; font-size: 1.15rem; color: var(--accent-cyan);">◼ ${source}</h3>`;
-                    articles.forEach(art => {
-                        nhHtml += `<div style="margin-top: 1rem; margin-left: 1rem;">`;
-                        nhHtml += `<div style="color: #ffffff; font-weight: 600; margin-bottom: 0.5rem;">- ${art.headline}</div>`;
-                        nhHtml += `<ol style="color: #e5e7eb; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.25rem;">`;
-                        if (art.numbered_points) {
-                            art.numbered_points.forEach(point => {
-                                nhHtml += `<li>${point}</li>`;
-                            });
-                        }
-                        nhHtml += `</ol>`;
-                        nhHtml += `<a href="${art.link}" target="_blank" class="read-original" style="margin-top: 0.75rem;">查看原始新聞網頁 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
-                        nhHtml += `</div>`;
+            // 1. Taiwan Market Card
+            if (newsData.taiwan_market) {
+                const twCard = document.createElement('article');
+                twCard.className = 'news-card';
+                let twHtml = `<div class="badge-container" style="margin-bottom: 1rem;"><span class="category-badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">台股盤後</span></div>`;
+                twHtml += `<h3 class="headline" style="margin-top: 1rem;">◼ 三大法人買賣超</h3>`;
+                twHtml += `<ul style="color: #e5e7eb; padding-left: 1.5rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">`;
+                if (newsData.taiwan_market.institutional_trading) {
+                    newsData.taiwan_market.institutional_trading.forEach(point => {
+                        twHtml += `<li>${point}</li>`;
                     });
                 }
-                nhCard.innerHTML = nhHtml;
-                elements.newsContainer.appendChild(nhCard);
+                twHtml += `</ul>`;
+                twHtml += `<h3 class="headline" style="margin-top: 1rem;">◼ 盤後重點統整</h3>`;
+                twHtml += `<p style="color: #d1d5db; margin-top: 0.5rem; line-height: 1.6;">${newsData.taiwan_market.summary || ''}</p>`;
+                twCard.innerHTML = twHtml;
+                elements.newsContainer.appendChild(twCard);
             }
+
+            // 2. US Market Card
+            if (newsData.us_market) {
+                const usCard = document.createElement('article');
+                usCard.className = 'news-card';
+                let usHtml = `<div class="badge-container" style="margin-bottom: 1rem;"><span class="category-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">美股盤後</span></div>`;
+                usHtml += `<h3 class="headline" style="margin-top: 1rem;">◼ 四大指數表現</h3>`;
+                usHtml += `<ul style="color: #e5e7eb; padding-left: 1.5rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">`;
+                if (newsData.us_market.indices_performance) {
+                    newsData.us_market.indices_performance.forEach(point => {
+                        usHtml += `<li>${point}</li>`;
+                    });
+                }
+                usHtml += `</ul>`;
+                usHtml += `<h3 class="headline" style="margin-top: 1rem;">◼ 盤後重點統整</h3>`;
+                usHtml += `<p style="color: #d1d5db; margin-top: 0.5rem; line-height: 1.6;">${newsData.us_market.summary || ''}</p>`;
+                usCard.innerHTML = usHtml;
+                elements.newsContainer.appendChild(usCard);
+            }
+
+            // Helper to render news card
+            const renderNewsCard = (title, newsArray, badgeColor, textColor) => {
+                if (!newsArray || newsArray.length === 0) return;
+                const card = document.createElement('article');
+                card.className = 'news-card';
+                let html = `<div class="badge-container" style="margin-bottom: 1rem;"><span class="category-badge" style="background: ${badgeColor}; color: ${textColor}; border: 1px solid ${textColor};">${title}</span></div>`;
+                
+                newsArray.forEach(art => {
+                    html += `<div style="margin-top: 1.25rem;">`;
+                    html += `<div style="color: #ffffff; font-weight: 600; margin-bottom: 0.5rem; font-size: 1.1rem;">- ${art.headline}</div>`;
+                    html += `<ol style="color: #e5e7eb; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.4rem; line-height: 1.5;">`;
+                    if (art.points) {
+                        art.points.forEach(point => {
+                            html += `<li>${point}</li>`;
+                        });
+                    }
+                    html += `</ol>`;
+                    html += `<a href="${art.link}" target="_blank" class="read-original" style="margin-top: 0.75rem; display: inline-flex;">查看原始新聞網頁 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`;
+                    html += `</div>`;
+                });
+                card.innerHTML = html;
+                elements.newsContainer.appendChild(card);
+            };
+
+            // 3 & 4. News Cards
+            renderNewsCard('經濟日報', newsData.economic_daily_news, 'rgba(236, 72, 153, 0.15)', '#f472b6');
+            renderNewsCard('工商時報', newsData.commercial_times_news, 'rgba(245, 158, 11, 0.15)', '#fbbf24');
         }
 
         // Generate Formatted Text Report
         function generateReportText(data) {
             let text = "";
             
-            if (data.post_market_reports && data.post_market_reports.length > 0) {
-                text += "[Post-market Report]\n";
-                data.post_market_reports.forEach(report => {
-                    text += `◼ ${report.title}\n`;
-                    if (report.bullet_points) {
-                        report.bullet_points.forEach(point => {
-                            text += `  - ${point}\n`;
+            if (data.taiwan_market) {
+                text += "[台股盤後]\n";
+                text += "◼ 三大法人買賣超\n";
+                if (data.taiwan_market.institutional_trading) {
+                    data.taiwan_market.institutional_trading.forEach(point => {
+                        text += `  - ${point}\n`;
+                    });
+                }
+                text += `◼ 盤後重點統整\n  ${data.taiwan_market.summary}\n\n`;
+            }
+
+            if (data.us_market) {
+                text += "[美股盤後]\n";
+                text += "◼ 四大指數表現\n";
+                if (data.us_market.indices_performance) {
+                    data.us_market.indices_performance.forEach(point => {
+                        text += `  - ${point}\n`;
+                    });
+                }
+                text += `◼ 盤後重點統整\n  ${data.us_market.summary}\n\n`;
+            }
+
+            const appendNewsText = (title, newsArray) => {
+                if (!newsArray || newsArray.length === 0) return;
+                text += `[${title}]\n`;
+                newsArray.forEach(art => {
+                    text += `- ${art.headline}\n`;
+                    if (art.points) {
+                        art.points.forEach((point, idx) => {
+                            text += `  ${idx + 1}. ${point}\n`;
                         });
                     }
-                    text += "\n";
                 });
-            }
+                text += "\n";
+            };
 
-            if (data.news_headlines && data.news_headlines.length > 0) {
-                text += "[News Headlines]\n";
-                const grouped = {};
-                data.news_headlines.forEach(news => {
-                    if (!grouped[news.source]) grouped[news.source] = [];
-                    grouped[news.source].push(news);
-                });
+            appendNewsText('經濟日報', data.economic_daily_news);
+            appendNewsText('工商時報', data.commercial_times_news);
 
-                for (const [source, articles] of Object.entries(grouped)) {
-                    text += `◼ ${source}\n`;
-                    articles.forEach(art => {
-                        text += `  - ${art.headline}\n`;
-                        if (art.numbered_points) {
-                            art.numbered_points.forEach((point, idx) => {
-                                text += `  ${idx + 1}. ${point}\n`;
-                            });
-                        }
-                    });
-                    text += "\n";
-                }
-            }
             return text.trim();
         }
 
