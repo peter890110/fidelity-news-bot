@@ -217,12 +217,11 @@ def get_news():
    - 原則上僅篩選過去 {timeframe_hours} 小時內的新聞。{monday_rule}
 4. **輸出格式與語言**：
    - 必須完全使用繁體中文（Traditional Chinese）回答。
-   - 必須依據指定的 JSON 格式將新聞分為兩大類：
-     a) `post_market_reports`: 盤後統整報告。請務必包含〈美股盤後〉與〈台股盤後〉兩個區塊：
-        - 〈美股盤後〉：必須包含「四大指數表現（道瓊、那斯達克、S&P 500、費城半導體）」以及「昨日走勢分析」。
-        - 〈台股盤後〉：必須包含「成交量」、「三大法人買賣超資訊」，以及「今日領軍強勢股表現」。
-        若新聞列表中缺少確切數據，請盡可能從現有總經新聞中提煉大盤方向。內文請拆分為多個重點短句（bullet points）。
-     b) `news_headlines`: 各報重大新聞頭條。摘要需擴充至約 100 字，並拆分成 2-3 點有邏輯的段落重點（numbered points）。
+   - 必須依據指定的 JSON 格式將新聞分為四大板塊：
+     a) `taiwan_market`: 第一板塊。必須包含「三大法人各別買賣超與合計買賣超（如：外資及陸資買賣超、投信買賣超、自營商買賣超、合計買賣超）」以及「台股盤後100字統整」。若新聞無明確數據，請從現有新聞中提煉大盤方向。
+     b) `us_market`: 第二板塊。必須包含「美股四大指數的收盤表現（以 % 呈現，如：道瓊指數 +x.xx%）」以及「美股盤後100字統整」。
+     c) `economic_daily_news`: 第三板塊。請從「經濟日報」中挑選 2 則最重大的財經新聞，並各提供 1~2 點條列式重點整理。
+     d) `commercial_times_news`: 第四板塊。請從「工商時報」中挑選 2 則最重大的財經新聞，並各提供 1~2 點條列式重點整理。
    - 請精確使用提供的原網址。
 
 以下是今日的新聞列表：
@@ -247,52 +246,70 @@ def get_news():
             "responseSchema": {
                 "type": "OBJECT",
                 "properties": {
-                    "post_market_reports": {
+                    "taiwan_market": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "institutional_trading": {
+                                "type": "ARRAY",
+                                "items": {"type": "STRING"},
+                                "description": "三大法人各別與合計買賣超，例如：'外資及陸資：買超 xxx 億'、'投信：...'、'自營商：...'、'合計：...'"
+                            },
+                            "summary": {
+                                "type": "STRING",
+                                "description": "台股盤後100字統整"
+                            }
+                        },
+                        "required": ["institutional_trading", "summary"]
+                    },
+                    "us_market": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "indices_performance": {
+                                "type": "ARRAY",
+                                "items": {"type": "STRING"},
+                                "description": "美股四大指數收盤表現(以%呈現)，例如：'道瓊指數：+x.xx%'、'那斯達克：-x.xx%'"
+                            },
+                            "summary": {
+                                "type": "STRING",
+                                "description": "美股盤後100字統整"
+                            }
+                        },
+                        "required": ["indices_performance", "summary"]
+                    },
+                    "economic_daily_news": {
                         "type": "ARRAY",
                         "items": {
                             "type": "OBJECT",
                             "properties": {
-                                "title": {
-                                    "type": "STRING",
-                                    "description": "例如：〈美股盤後〉特斯拉跌逾7%... 或重大總經統整標題"
-                                },
-                                "bullet_points": {
+                                "headline": {"type": "STRING"},
+                                "points": {
                                     "type": "ARRAY",
                                     "items": {"type": "STRING"},
-                                    "description": "該統整報告的重點短句列表，例如：主要指數表現：道瓊指數上漲... 或 其他盤勢觀察。"
-                                }
+                                    "description": "1, 2點條列式重點整理"
+                                },
+                                "link": {"type": "STRING"}
                             },
-                            "required": ["title", "bullet_points"]
+                            "required": ["headline", "points", "link"]
                         }
                     },
-                    "news_headlines": {
+                    "commercial_times_news": {
                         "type": "ARRAY",
                         "items": {
                             "type": "OBJECT",
                             "properties": {
-                                "source": {
-                                    "type": "STRING",
-                                    "description": "新聞來源媒體名稱（例如：經濟日報、工商時報）"
-                                },
-                                "headline": {
-                                    "type": "STRING",
-                                    "description": "新聞標題"
-                                },
-                                "numbered_points": {
+                                "headline": {"type": "STRING"},
+                                "points": {
                                     "type": "ARRAY",
                                     "items": {"type": "STRING"},
-                                    "description": "約 100 字的新聞深度摘要，拆分為 2 到 3 個重點句子，用於編號呈現。"
+                                    "description": "1, 2點條列式重點整理"
                                 },
-                                "link": {
-                                    "type": "STRING",
-                                    "description": "新聞列表中對應的完整超連結"
-                                }
+                                "link": {"type": "STRING"}
                             },
-                            "required": ["source", "headline", "numbered_points", "link"]
+                            "required": ["headline", "points", "link"]
                         }
                     }
                 },
-                "required": ["post_market_reports", "news_headlines"]
+                "required": ["taiwan_market", "us_market", "economic_daily_news", "commercial_times_news"]
             }
         }
     }
@@ -320,11 +337,12 @@ def get_news():
             # Post-process: Decode only the URLs chosen by Gemini to save time
             try:
                 result_data = json.loads(content_text)
-                if "news_headlines" in result_data:
-                    for article in result_data["news_headlines"]:
-                        orig_link = article.get("link", "")
-                        if orig_link:
-                            article["link"] = decode_google_news_url(orig_link)
+                for key in ["economic_daily_news", "commercial_times_news"]:
+                    if key in result_data:
+                        for article in result_data[key]:
+                            orig_link = article.get("link", "")
+                            if orig_link:
+                                article["link"] = decode_google_news_url(orig_link)
                 content_text = json.dumps(result_data, ensure_ascii=False)
             except Exception as e:
                 print(f"Error decoding URLs in JSON: {e}")
