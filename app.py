@@ -9,6 +9,8 @@ import concurrent.futures
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
 from googlenewsdecoder import gnewsdecoder
+import yfinance as yf
+import pandas as pd
 
 # Load env variables if .env exists
 load_dotenv()
@@ -104,6 +106,55 @@ def fetch_feed_articles(feed_key, feed_info):
     except Exception as e:
         print(f"Error fetching/parsing feed {feed_info['name']}: {e}")
     return articles
+
+def fetch_twse_institutional():
+    try:
+        url = "https://www.twse.com.tw/fund/BFI82U?response=json&type=day"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        if data.get("stat") != "OK":
+            return ["TWSE 數據抓取失敗"]
+            
+        results = []
+        for row in data.get("data", []):
+            name = row[0]
+            try:
+                net_val = float(row[3].replace(",", "")) / 100000000
+                action = "買超" if net_val >= 0 else "賣超"
+                formatted_val = f"{abs(net_val):.2f} 億"
+                results.append(f"{name}：{action} {formatted_val}")
+            except (ValueError, IndexError):
+                continue
+                
+        return results if results else ["TWSE 無資料"]
+    except Exception as e:
+        print(f"Error fetching TWSE: {e}")
+        return ["TWSE 數據抓取異常"]
+
+def fetch_us_indices():
+    try:
+        tickers = {
+            "^DJI": "道瓊指數",
+            "^IXIC": "那斯達克",
+            "^GSPC": "S&P 500",
+            "^SOX": "費城半導體"
+        }
+        results = []
+        for symbol, name in tickers.items():
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="5d")
+            if len(hist) >= 2:
+                last_close = hist['Close'].iloc[-1]
+                prev_close = hist['Close'].iloc[-2]
+                pct_change = ((last_close - prev_close) / prev_close) * 100
+                sign = "+" if pct_change > 0 else ""
+                results.append(f"{name}：{sign}{pct_change:.2f}%")
+            else:
+                results.append(f"{name}：無資料")
+        return results if results else ["美股指數抓取失敗"]
+    except Exception as e:
+        print(f"Error fetching US indices: {e}")
+        return ["美股指數抓取異常"]
 
 @app.route('/')
 def index():
@@ -218,8 +269,8 @@ def get_news():
 4. **輸出格式與語言**：
    - 必須完全使用繁體中文（Traditional Chinese）回答。
    - 必須依據指定的 JSON 格式將新聞分為四大板塊：
-     a) `taiwan_market`: 第一板塊。必須包含「三大法人各別買賣超與合計買賣超（如：外資及陸資買賣超、投信買賣超、自營商買賣超、合計買賣超）」以及「台股盤後100字統整」。若新聞無明確數據，請從現有新聞中提煉大盤方向。
-     b) `us_market`: 第二板塊。必須包含「美股四大指數的收盤表現（以 % 呈現，如：道瓊指數 +x.xx%）」以及「美股盤後100字統整」。
+     a) `taiwan_market`: 第一板塊。必須包含「台股盤後100字統整」。請專心為今日台股盤面與新聞做總結。
+     b) `us_market`: 第二板塊。必須包含「美股盤後100字統整」。請專心為昨日美股盤面與新聞做總結。
      c) `economic_daily_news`: 第三板塊。請從「經濟日報」中挑選 2 則最重大的財經新聞，並各提供 1~2 點條列式重點整理。
      d) `commercial_times_news`: 第四板塊。請從「工商時報」中挑選 2 則最重大的財經新聞，並各提供 1~2 點條列式重點整理。
    - 請精確使用提供的原網址。
@@ -249,32 +300,22 @@ def get_news():
                     "taiwan_market": {
                         "type": "OBJECT",
                         "properties": {
-                            "institutional_trading": {
-                                "type": "ARRAY",
-                                "items": {"type": "STRING"},
-                                "description": "三大法人各別與合計買賣超，例如：'外資及陸資：買超 xxx 億'、'投信：...'、'自營商：...'、'合計：...'"
-                            },
                             "summary": {
                                 "type": "STRING",
                                 "description": "台股盤後100字統整"
                             }
                         },
-                        "required": ["institutional_trading", "summary"]
+                        "required": ["summary"]
                     },
                     "us_market": {
                         "type": "OBJECT",
                         "properties": {
-                            "indices_performance": {
-                                "type": "ARRAY",
-                                "items": {"type": "STRING"},
-                                "description": "美股四大指數收盤表現(以%呈現)，例如：'道瓊指數：+x.xx%'、'那斯達克：-x.xx%'"
-                            },
                             "summary": {
                                 "type": "STRING",
                                 "description": "美股盤後100字統整"
                             }
                         },
-                        "required": ["indices_performance", "summary"]
+                        "required": ["summary"]
                     },
                     "economic_daily_news": {
                         "type": "ARRAY",
@@ -337,6 +378,13 @@ def get_news():
             # Post-process: Decode only the URLs chosen by Gemini to save time
             try:
                 result_data = json.loads(content_text)
+                
+                # Inject real-time scraped data
+                if "taiwan_market" in result_data:
+                    result_data["taiwan_market"]["institutional_trading"] = fetch_twse_institutional()
+                if "us_market" in result_data:
+                    result_data["us_market"]["indices_performance"] = fetch_us_indices()
+
                 for key in ["economic_daily_news", "commercial_times_news"]:
                     if key in result_data:
                         for article in result_data[key]:
