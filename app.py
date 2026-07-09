@@ -3,6 +3,7 @@ import re
 import json
 import base64
 import requests
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 import concurrent.futures
@@ -131,29 +132,49 @@ def fetch_twse_institutional():
         print(f"Error fetching TWSE: {e}")
         return ["TWSE 數據抓取異常"]
 
+def fetch_twse_volume():
+    try:
+        url = "https://www.twse.com.tw/exchangeReport/FMTQIK?response=json"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+        if data.get("stat") == "OK" and "data" in data and len(data["data"]) > 0:
+            last_day = data["data"][-1]
+            turnover_str = last_day[2]
+            turnover_val = float(turnover_str.replace(",", "")) / 100000000
+            return f"大盤成交量：{turnover_val:.2f} 億"
+    except Exception as e:
+        print(f"Error fetching TWSE volume: {e}")
+    return "大盤成交量：抓取異常"
+
 def fetch_us_indices():
     tickers = {
-        "DIA": "道瓊指數",
+        "^DJI": "道瓊指數",
         "^IXIC": "那斯達克",
         "^GSPC": "S&P 500",
         "^SOX": "費城半導體"
     }
     results = []
     for symbol, name in tickers.items():
-        try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="5d")
-            if len(hist) >= 2:
-                # Convert explicitly to float to avoid pandas type issues
-                last_close = float(hist['Close'].iloc[-1])
-                prev_close = float(hist['Close'].iloc[-2])
-                pct_change = ((last_close - prev_close) / prev_close) * 100
-                sign = "+" if pct_change > 0 else ""
-                results.append(f"{name}：{sign}{pct_change:.2f}%")
-            else:
-                results.append(f"{name}：無資料")
-        except Exception as e:
-            print(f"Error fetching {symbol}: {e}")
+        success = False
+        for attempt in range(3):
+            try:
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(period="5d")
+                if len(hist) >= 2:
+                    # Convert explicitly to float to avoid pandas type issues
+                    last_close = float(hist['Close'].iloc[-1])
+                    prev_close = float(hist['Close'].iloc[-2])
+                    pct_change = ((last_close - prev_close) / prev_close) * 100
+                    sign = "+" if pct_change > 0 else ""
+                    results.append(f"{name}：{sign}{pct_change:.2f}%")
+                else:
+                    results.append(f"{name}：無資料")
+                success = True
+                break
+            except Exception as e:
+                print(f"Error fetching {symbol} attempt {attempt}: {e}")
+                time.sleep(1)
+        if not success:
             results.append(f"{name}：抓取異常")
             
     return results if results else ["美股指數抓取失敗"]
@@ -383,7 +404,9 @@ def get_news():
                 
                 # Inject real-time scraped data
                 if "taiwan_market" in result_data:
-                    result_data["taiwan_market"]["institutional_trading"] = fetch_twse_institutional()
+                    tw_data = fetch_twse_institutional()
+                    tw_data.insert(0, fetch_twse_volume())
+                    result_data["taiwan_market"]["institutional_trading"] = tw_data
                 if "us_market" in result_data:
                     result_data["us_market"]["indices_performance"] = fetch_us_indices()
 
