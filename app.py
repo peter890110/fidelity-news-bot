@@ -132,29 +132,31 @@ def fetch_twse_institutional():
         return ["TWSE 數據抓取異常"]
 
 def fetch_us_indices():
-    try:
-        tickers = {
-            "^DJI": "道瓊指數",
-            "^IXIC": "那斯達克",
-            "^GSPC": "S&P 500",
-            "^SOX": "費城半導體"
-        }
-        results = []
-        for symbol, name in tickers.items():
+    tickers = {
+        "^DJI": "道瓊指數",
+        "^IXIC": "那斯達克",
+        "^GSPC": "S&P 500",
+        "^SOX": "費城半導體"
+    }
+    results = []
+    for symbol, name in tickers.items():
+        try:
             ticker = yf.Ticker(symbol)
             hist = ticker.history(period="5d")
             if len(hist) >= 2:
-                last_close = hist['Close'].iloc[-1]
-                prev_close = hist['Close'].iloc[-2]
+                # Convert explicitly to float to avoid pandas type issues
+                last_close = float(hist['Close'].iloc[-1])
+                prev_close = float(hist['Close'].iloc[-2])
                 pct_change = ((last_close - prev_close) / prev_close) * 100
                 sign = "+" if pct_change > 0 else ""
                 results.append(f"{name}：{sign}{pct_change:.2f}%")
             else:
                 results.append(f"{name}：無資料")
-        return results if results else ["美股指數抓取失敗"]
-    except Exception as e:
-        print(f"Error fetching US indices: {e}")
-        return ["美股指數抓取異常"]
+        except Exception as e:
+            print(f"Error fetching {symbol}: {e}")
+            results.append(f"{name}：抓取異常")
+            
+    return results if results else ["美股指數抓取失敗"]
 
 @app.route('/')
 def index():
