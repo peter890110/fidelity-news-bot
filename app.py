@@ -133,7 +133,7 @@ def fetch_twse_institutional():
 
 def fetch_us_indices():
     tickers = {
-        "^DJI": "道瓊指數",
+        "DIA": "道瓊指數",
         "^IXIC": "那斯達克",
         "^GSPC": "S&P 500",
         "^SOX": "費城半導體"
