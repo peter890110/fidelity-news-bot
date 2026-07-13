@@ -116,17 +116,29 @@ def fetch_twse_institutional():
         if data.get("stat") != "OK":
             return ["TWSE 數據抓取失敗"]
             
-        results = []
+        agg_data = {"外資": 0.0, "投信": 0.0, "自營商": 0.0, "合計": 0.0}
+        
         for row in data.get("data", []):
             name = row[0]
             try:
                 net_val = float(row[3].replace(",", "")) / 100000000
-                action = "買超" if net_val >= 0 else "賣超"
-                formatted_val = f"{abs(net_val):.2f} 億"
-                results.append(f"{name}：{action} {formatted_val}")
+                if "外資" in name:
+                    agg_data["外資"] += net_val
+                elif "投信" in name:
+                    agg_data["投信"] += net_val
+                elif "自營商" in name:
+                    agg_data["自營商"] += net_val
+                elif "合計" in name:
+                    agg_data["合計"] += net_val
             except (ValueError, IndexError):
                 continue
                 
+        results = []
+        for key in ["投信", "自營商", "外資", "合計"]:
+            val = agg_data[key]
+            action = "買超" if val >= 0 else "賣超"
+            results.append(f"{key}：{action} {abs(val):.2f} 億")
+            
         return results if results else ["TWSE 無資料"]
     except Exception as e:
         print(f"Error fetching TWSE: {e}")
@@ -294,8 +306,8 @@ def get_news():
    - 必須依據指定的 JSON 格式將新聞分為四大板塊：
      a) `taiwan_market`: 第一板塊。必須包含「台股盤後100字統整」。請專心為今日台股盤面與新聞做總結。
      b) `us_market`: 第二板塊。必須包含「美股盤後100字統整」。請專心為昨日美股盤面與新聞做總結。
-     c) `economic_daily_news`: 第三板塊。請從「經濟日報」中挑選 2 則最重大的財經新聞，並各提供 1~2 點條列式重點整理。
-     d) `commercial_times_news`: 第四板塊。請從「工商時報」中挑選 2 則最重大的財經新聞，並各提供 1~2 點條列式重點整理。
+     c) `economic_daily_news`: 第三板塊。請從「經濟日報」中挑選 2 則最重大的財經新聞。每則新聞【最多3點】條列式重點，且【每一點絕對不得少於 100 字】，請提供極度深度的見解與分析。
+     d) `commercial_times_news`: 第四板塊。請從「工商時報」中挑選 2 則最重大的財經新聞。每則新聞【最多3點】條列式重點，且【每一點絕對不得少於 100 字】，請提供極度深度的見解與分析。
    - 請精確使用提供的原網址。
 
 以下是今日的新聞列表：
@@ -349,7 +361,7 @@ def get_news():
                                 "points": {
                                     "type": "ARRAY",
                                     "items": {"type": "STRING"},
-                                    "description": "1, 2點條列式重點整理"
+                                    "description": "最多3點重點整理，每點不得少於100字"
                                 },
                                 "link": {"type": "STRING"}
                             },
@@ -365,7 +377,7 @@ def get_news():
                                 "points": {
                                     "type": "ARRAY",
                                     "items": {"type": "STRING"},
-                                    "description": "1, 2點條列式重點整理"
+                                    "description": "最多3點重點整理，每點不得少於100字"
                                 },
                                 "link": {"type": "STRING"}
                             },
