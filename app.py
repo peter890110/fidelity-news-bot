@@ -6,6 +6,7 @@ import requests
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
+from email.utils import parsedate_to_datetime
 import concurrent.futures
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
@@ -22,11 +23,11 @@ app = Flask(__name__, template_folder='templates')
 FEEDS = {
     "economic_daily": {
         "name": "經濟日報",
-        "url": "https://news.google.com/rss/search?q=site:money.udn.com&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        "url": "https://news.google.com/rss/search?q=site:money.udn.com+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     },
     "commercial_times": {
         "name": "工商時報",
-        "url": "https://news.google.com/rss/search?q=site:ctee.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        "url": "https://news.google.com/rss/search?q=site:ctee.com.tw+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     },
     "global_market": {
         "name": "國際與美股財經",
@@ -46,21 +47,12 @@ def decode_google_news_url(url):
     return url
 
 def parse_pub_date(date_str):
-    """Parse Google News RSS pubDate string into a timezone-naive UTC datetime object."""
+    """Parse RSS pubDate string into a timezone-naive UTC datetime object."""
     if not date_str:
         return None
-    # Example format: "Fri, 03 Jul 2026 17:35:44 GMT"
-    # Try parsing GMT
-    for fmt in ("%a, %d %b %Y %H:%M:%S GMT", "%a, %d %b %Y %H:%M:%S %Z", "%a, %d %b %Y %H:%M:%S %z"):
-        try:
-            return datetime.strptime(date_str, fmt)
-        except ValueError:
-            continue
-    # Fallback to general parsing if possible
     try:
-        # Simple slicing for standard RSS dates if formats mismatch slightly
-        clean_str = date_str.split('+')[0].strip()
-        return datetime.strptime(clean_str, "%a, %d %b %Y %H:%M:%S")
+        dt = parsedate_to_datetime(date_str)
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
     except Exception:
         return None
 
