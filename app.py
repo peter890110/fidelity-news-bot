@@ -23,7 +23,7 @@ app = Flask(__name__, template_folder='templates')
 FEEDS = {
     "economic_daily": {
         "name": "經濟日報",
-        "url": "https://news.google.com/rss/search?q=site:money.udn.com+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        "url": "https://money.udn.com/rssfeed/news/1001/5588/10511?ch=money"
     },
     "commercial_times": {
         "name": "工商時報",
@@ -237,6 +237,10 @@ def get_news():
             if any(k in title for k in ["收盤", "盤後", "法人", "外資", "非農", "指數", "道瓊", "台股", "美股"]):
                 filtered_articles.append(art)
                 friday_articles_found += 1
+                
+    if not filtered_articles:
+        print(f"Warning: No articles found in last {timeframe_hours} hours. Falling back to most recent 15 articles.")
+        filtered_articles = sorted(all_articles, key=lambda x: x["pub_date"] if x["pub_date"] else datetime.min, reverse=True)[:15]
             
     print(f"Articles within last {timeframe_hours} hours: {len(filtered_articles) - friday_articles_found}")
     if is_monday_morning_exception:
