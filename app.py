@@ -27,7 +27,7 @@ FEEDS = {
     },
     "commercial_times": {
         "name": "工商時報",
-        "url": "https://news.google.com/rss/search?q=site:ctee.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        "url": "https://news.google.com/rss/search?q=%22工商時報%22+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     },
     "global_market": {
         "name": "國際與美股財經",
@@ -100,55 +100,43 @@ def fetch_feed_articles(feed_key, feed_info):
         print(f"Error fetching/parsing feed {feed_info['name']}: {e}")
     return articles
 
-def fetch_twse_institutional():
+def fetch_twse_data():
     try:
-        url = "https://www.twse.com.tw/fund/BFI82U?response=json&type=day"
-        r = requests.get(url, timeout=10)
-        data = r.json()
-        if data.get("stat") != "OK":
-            return ["TWSE 數據抓取失敗"]
-            
+        # fetch volume
+        volume_url = "https://www.twse.com.tw/exchangeReport/FMTQIK?response=json"
+        vol_r = requests.get(volume_url, timeout=10).json()
+        turnover_val = 0
+        if vol_r.get("stat") == "OK" and "data" in vol_r and len(vol_r["data"]) > 0:
+            turnover_str = vol_r["data"][-1][2]
+            turnover_val = float(turnover_str.replace(",", "")) / 100000000
+
+        # fetch inst
+        inst_url = "https://www.twse.com.tw/fund/BFI82U?response=json&type=day"
+        inst_r = requests.get(inst_url, timeout=10).json()
         agg_data = {"外資": 0.0, "投信": 0.0, "自營商": 0.0, "合計": 0.0}
+        if inst_r.get("stat") == "OK":
+            for row in inst_r.get("data", []):
+                name = row[0]
+                try:
+                    net_val = float(row[3].replace(",", "")) / 100000000
+                    if "外資" in name: agg_data["外資"] += net_val
+                    elif "投信" in name: agg_data["投信"] += net_val
+                    elif "自營商" in name: agg_data["自營商"] += net_val
+                    elif "合計" in name: agg_data["合計"] += net_val
+                except (ValueError, IndexError):
+                    pass
+
+        def fmt_val(v):
+            return f"{'買超' if v >= 0 else '賣超'} {abs(v):.2f}"
+
+        vol_val_trillion = turnover_val / 10000
+        line1 = f"成交量 {vol_val_trillion:.2f} 兆元；三大法人合計{fmt_val(agg_data['合計'])} 億元。"
+        line2 = f"觀察三大法人今天籌碼動向，外資{fmt_val(agg_data['外資'])} 億元；自營商{fmt_val(agg_data['自營商'])} 億元；投信{fmt_val(agg_data['投信'])} 億元。"
         
-        for row in data.get("data", []):
-            name = row[0]
-            try:
-                net_val = float(row[3].replace(",", "")) / 100000000
-                if "外資" in name:
-                    agg_data["外資"] += net_val
-                elif "投信" in name:
-                    agg_data["投信"] += net_val
-                elif "自營商" in name:
-                    agg_data["自營商"] += net_val
-                elif "合計" in name:
-                    agg_data["合計"] += net_val
-            except (ValueError, IndexError):
-                continue
-                
-        results = []
-        for key in ["投信", "自營商", "外資", "合計"]:
-            val = agg_data[key]
-            action = "買超" if val >= 0 else "賣超"
-            results.append(f"{key}：{action} {abs(val):.2f} 億")
-            
-        return results if results else ["TWSE 無資料"]
+        return [line1, line2]
     except Exception as e:
         print(f"Error fetching TWSE: {e}")
         return ["TWSE 數據抓取異常"]
-
-def fetch_twse_volume():
-    try:
-        url = "https://www.twse.com.tw/exchangeReport/FMTQIK?response=json"
-        r = requests.get(url, timeout=10)
-        data = r.json()
-        if data.get("stat") == "OK" and "data" in data and len(data["data"]) > 0:
-            last_day = data["data"][-1]
-            turnover_str = last_day[2]
-            turnover_val = float(turnover_str.replace(",", "")) / 100000000
-            return f"大盤成交量：{turnover_val:.2f} 億"
-    except Exception as e:
-        print(f"Error fetching TWSE volume: {e}")
-    return "大盤成交量：抓取異常"
 
 def fetch_us_indices():
     tickers = {
@@ -169,8 +157,8 @@ def fetch_us_indices():
                     last_close = float(hist['Close'].iloc[-1])
                     prev_close = float(hist['Close'].iloc[-2])
                     pct_change = ((last_close - prev_close) / prev_close) * 100
-                    sign = "+" if pct_change > 0 else ""
-                    results.append(f"{name}：{sign}{pct_change:.2f}%")
+                    sign = "上漲" if pct_change > 0 else "下跌"
+                    results.append(f"{name}{sign}{abs(pct_change):.2f}%")
                 else:
                     results.append(f"{name}：無資料")
                 success = True
@@ -412,9 +400,7 @@ def get_news():
                 
                 # Inject real-time scraped data
                 if "taiwan_market" in result_data:
-                    tw_data = fetch_twse_institutional()
-                    tw_data.insert(0, fetch_twse_volume())
-                    result_data["taiwan_market"]["institutional_trading"] = tw_data
+                    result_data["taiwan_market"]["institutional_trading"] = fetch_twse_data()
                 if "us_market" in result_data:
                     result_data["us_market"]["indices_performance"] = fetch_us_indices()
 
