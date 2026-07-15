@@ -23,11 +23,11 @@ app = Flask(__name__, template_folder='templates')
 FEEDS = {
     "economic_daily": {
         "name": "經濟日報",
-        "url": "https://money.udn.com/rssfeed/news/1001/5588/10511?ch=money"
+        "url": "https://money.udn.com/rssfeed/news/1001/5590/5607?ch=money"
     },
     "commercial_times": {
         "name": "工商時報",
-        "url": "https://news.google.com/rss/search?q=site:ctee.com.tw+when:1d&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+        "url": "https://news.google.com/rss/search?q=site:ctee.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     },
     "global_market": {
         "name": "國際與美股財經",
@@ -300,8 +300,8 @@ def get_news():
 4. **輸出格式與語言**：
    - 必須完全使用繁體中文（Traditional Chinese）回答。
    - 必須依據指定的 JSON 格式將新聞分為四大板塊：
-     a) `taiwan_market`: 第一板塊。必須包含「台股盤後100字統整」。請專心為今日台股盤面與新聞做總結。
-     b) `us_market`: 第二板塊。必須包含「美股盤後100字統整」。請專心為昨日美股盤面與新聞做總結。
+     a) `taiwan_market`: 第一板塊。必須包含「台股盤後100字統整」。請根據我們提供的真實數據與新聞，專心為「最新一個交易日」的台股盤面做總結，不要提「今日」或「昨日」以免時間軸混淆。
+     b) `us_market`: 第二板塊。必須包含「美股盤後100字統整」。請根據我們提供的真實數據與新聞，專心為「最新一個交易日」的美股盤面做總結，不要提「今日」或「昨日」以免時間軸混淆。
      c) `economic_daily_news`: 第三板塊。請從「經濟日報」中挑選 2 則最重大的財經新聞。每則新聞【最多3點】條列式重點，且【每一點絕對不得少於 100 字】，請提供極度深度的見解與分析。
      d) `commercial_times_news`: 第四板塊。請從「工商時報」中挑選 2 則最重大的財經新聞。每則新聞【最多3點】條列式重點，且【每一點絕對不得少於 100 字】，請提供極度深度的見解與分析。
    - 請精確使用提供的原網址。
