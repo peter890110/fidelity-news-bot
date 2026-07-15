@@ -237,6 +237,13 @@ def get_news():
     # Group articles by source to ensure we have representation
     economic_daily_articles = [a for a in filtered_articles if a["feed_key"] == "economic_daily"]
     commercial_times_articles = [a for a in filtered_articles if a["feed_key"] == "commercial_times"]
+    
+    # Fallback per feed if completely missing due to time filters
+    if not economic_daily_articles:
+        economic_daily_articles = [a for a in all_articles if a["feed_key"] == "economic_daily"]
+    if not commercial_times_articles:
+        commercial_times_articles = [a for a in all_articles if a["feed_key"] == "commercial_times"]
+        
     other_articles = [a for a in filtered_articles if a["feed_key"] not in ("economic_daily", "commercial_times")]
     
     # Limit number of articles sent to Gemini to prevent token overflow
