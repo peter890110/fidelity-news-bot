@@ -393,11 +393,26 @@ def get_news():
         "Content-Type": "application/json"
     }
     
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=90)
-        if response.status_code != 200:
-            print(f"Gemini API Error: {response.text}")
-            return jsonify({"error": f"Gemini API 回傳錯誤 ({response.status_code}): {response.text}"}), 502
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=90)
+            if response.status_code == 200:
+                break
+            elif response.status_code in (503, 429):
+                print(f"Gemini API Overloaded ({response.status_code}). Retrying {attempt+1}/{max_retries} in {2**attempt}s...")
+                time.sleep(2 ** attempt)
+                continue
+            else:
+                print(f"Gemini API Error: {response.text}")
+                return jsonify({"error": f"Gemini API 回傳錯誤 ({response.status_code}): {response.text}"}), 502
+        except Exception as e:
+            print(f"Error calling Gemini API: {e}")
+            if attempt == max_retries - 1:
+                return jsonify({"error": f"呼叫 Gemini API 發生例外錯誤: {str(e)}"}), 500
+            time.sleep(2 ** attempt)
+    else:
+        return jsonify({"error": f"Gemini API 目前伺服器過度擁擠 (503 High Demand)，系統已自動重試 {max_retries} 次仍失敗，請稍後再試。"}), 503
             
         result = response.json()
         
