@@ -35,6 +35,7 @@ FEEDS = {
     }
 }
 
+
 def decode_google_news_url(url):
     """Attempt to decode base64 encoded Google News URL to actual publisher URL."""
     try:
@@ -46,6 +47,7 @@ def decode_google_news_url(url):
         pass
     return url
 
+
 def parse_pub_date(date_str):
     """Parse RSS pubDate string into a timezone-naive UTC datetime object."""
     if not date_str:
@@ -56,6 +58,7 @@ def parse_pub_date(date_str):
     except Exception:
         return None
 
+
 def fetch_feed_articles(feed_key, feed_info):
     """Fetch and parse a single Google News RSS feed."""
     articles = []
@@ -65,28 +68,29 @@ def fetch_feed_articles(feed_key, feed_info):
     try:
         response = requests.get(feed_info["url"], headers=headers, timeout=10)
         if response.status_code != 200:
-            print(f"Error fetching {feed_info['name']}: HTTP {response.status_code}")
+            print(
+                f"Error fetching {feed_info['name']}: HTTP {response.status_code}")
             return articles
-        
+
         # Parse XML
         root = ET.fromstring(response.content)
         channel = root.find('channel')
         if channel is None:
             return articles
-            
+
         for item in channel.findall('item'):
             title_elem = item.find('title')
             link_elem = item.find('link')
             pub_date_elem = item.find('pubDate')
             source_elem = item.find('source')
-            
+
             title = title_elem.text if title_elem is not None else ""
             link = link_elem.text if link_elem is not None else ""
             pub_date_str = pub_date_elem.text if pub_date_elem is not None else ""
             source = source_elem.text if source_elem is not None else feed_info["name"]
-            
+
             pub_date = parse_pub_date(pub_date_str)
-            
+
             articles.append({
                 "title": title,
                 "link": link,
@@ -99,6 +103,7 @@ def fetch_feed_articles(feed_key, feed_info):
     except Exception as e:
         print(f"Error fetching/parsing feed {feed_info['name']}: {e}")
     return articles
+
 
 def fetch_twse_data():
     try:
@@ -119,10 +124,14 @@ def fetch_twse_data():
                 name = row[0]
                 try:
                     net_val = float(row[3].replace(",", "")) / 100000000
-                    if "外資" in name: agg_data["外資"] += net_val
-                    elif "投信" in name: agg_data["投信"] += net_val
-                    elif "自營商" in name: agg_data["自營商"] += net_val
-                    elif "合計" in name: agg_data["合計"] += net_val
+                    if "外資" in name:
+                        agg_data["外資"] += net_val
+                    elif "投信" in name:
+                        agg_data["投信"] += net_val
+                    elif "自營商" in name:
+                        agg_data["自營商"] += net_val
+                    elif "合計" in name:
+                        agg_data["合計"] += net_val
                 except (ValueError, IndexError):
                     pass
 
@@ -132,11 +141,12 @@ def fetch_twse_data():
         vol_val_trillion = turnover_val / 10000
         line1 = f"成交量 {vol_val_trillion:.2f} 兆元；三大法人合計{fmt_val(agg_data['合計'])} 億元。"
         line2 = f"觀察三大法人今天籌碼動向，外資{fmt_val(agg_data['外資'])} 億元；自營商{fmt_val(agg_data['自營商'])} 億元；投信{fmt_val(agg_data['投信'])} 億元。"
-        
+
         return [line1, line2]
     except Exception as e:
         print(f"Error fetching TWSE: {e}")
         return ["TWSE 數據抓取異常"]
+
 
 def fetch_us_indices():
     tickers = {
@@ -168,12 +178,14 @@ def fetch_us_indices():
                 time.sleep(1)
         if not success:
             results.append(f"{name}：抓取異常")
-            
+
     return results if results else ["美股指數抓取失敗"]
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.after_request
 def add_header(response):
@@ -182,45 +194,47 @@ def add_header(response):
     response.headers['Expires'] = '-1'
     return response
 
+
 @app.route('/api/news', methods=['POST'])
 def get_news():
     data = request.json or {}
     api_key = data.get('api_key') or os.environ.get('GEMINI_API_KEY')
     model = data.get('model') or 'gemini-1.5-flash'
     timeframe_hours = int(data.get('hours', 24))
-    
+
     if not api_key:
         return jsonify({"error": "請提供 Gemini API Key。您可以在設定中填寫，或在伺服器端環境變數中設定 GEMINI_API_KEY。"}), 400
-        
+
     print(f"Fetching feeds... (Timeframe filter: {timeframe_hours} hours)")
-    
+
     # Fetch feeds in parallel
     all_articles = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(fetch_feed_articles, key, info): key for key, info in FEEDS.items()}
+        futures = {executor.submit(
+            fetch_feed_articles, key, info): key for key, info in FEEDS.items()}
         for future in concurrent.futures.as_completed(futures):
             all_articles.extend(future.result())
-            
+
     print(f"Total articles fetched: {len(all_articles)}")
-    
+
     # Filter articles by time limit (e.g. last 12 or 24 hours)
     filtered_articles = []
     now_utc = datetime.utcnow()
-    
+
     # Check if it's Monday in Taiwan time (UTC+8)
     now_tw = now_utc + timedelta(hours=8)
     is_monday = now_tw.weekday() == 0
     is_monday_morning_exception = is_monday and timeframe_hours <= 24
     friday_articles_found = 0
-    
+
     for art in all_articles:
         if art["pub_date"] is None:
             # If parsing failed, keep it but warn
             filtered_articles.append(art)
             continue
-            
+
         age_hours = (now_utc - art["pub_date"]).total_seconds() / 3600.0
-        
+
         # If within the user-specified limit, always include
         if age_hours <= timeframe_hours:
             filtered_articles.append(art)
@@ -232,38 +246,51 @@ def get_news():
             if any(k in title for k in ["收盤", "盤後", "法人", "外資", "非農", "指數", "道瓊", "台股", "美股"]):
                 filtered_articles.append(art)
                 friday_articles_found += 1
-                
+
     if not filtered_articles:
-        print(f"Warning: No articles found in last {timeframe_hours} hours. Falling back to most recent 15 articles.")
-        filtered_articles = sorted(all_articles, key=lambda x: x["pub_date"] if x["pub_date"] else datetime.min, reverse=True)[:15]
-            
-    print(f"Articles within last {timeframe_hours} hours: {len(filtered_articles) - friday_articles_found}")
+        print(
+            f"Warning: No articles found in last {timeframe_hours} hours. Falling back to most recent 15 articles.")
+        filtered_articles = sorted(
+            all_articles, key=lambda x: x["pub_date"] if x["pub_date"] else datetime.min, reverse=True)[:15]
+
+    print(
+        f"Articles within last {timeframe_hours} hours: {len(filtered_articles) - friday_articles_found}")
     if is_monday_morning_exception:
-        print(f"Monday Exception: Added {friday_articles_found} Friday closing articles.")
-    
+        print(
+            f"Monday Exception: Added {friday_articles_found} Friday closing articles.")
+
     # Group articles by source to ensure we have representation
-    economic_daily_articles = [a for a in filtered_articles if a["feed_key"] == "economic_daily"]
-    commercial_times_articles = [a for a in filtered_articles if a["feed_key"] == "commercial_times"]
-    
+    economic_daily_articles = [
+        a for a in filtered_articles if a["feed_key"] == "economic_daily"]
+    commercial_times_articles = [
+        a for a in filtered_articles if a["feed_key"] == "commercial_times"]
+
     # Fallback per feed if completely missing due to time filters
     if not economic_daily_articles:
-        economic_daily_articles = [a for a in all_articles if a["feed_key"] == "economic_daily"]
+        economic_daily_articles = [
+            a for a in all_articles if a["feed_key"] == "economic_daily"]
     if not commercial_times_articles:
-        commercial_times_articles = [a for a in all_articles if a["feed_key"] == "commercial_times"]
-        
-    other_articles = [a for a in filtered_articles if a["feed_key"] not in ("economic_daily", "commercial_times")]
-    
+        commercial_times_articles = [
+            a for a in all_articles if a["feed_key"] == "commercial_times"]
+
+    other_articles = [a for a in filtered_articles if a["feed_key"] not in (
+        "economic_daily", "commercial_times")]
+
     # Limit number of articles sent to Gemini to prevent token overflow
     # Pick top 20 latest articles for each group
-    economic_daily_articles = sorted(economic_daily_articles, key=lambda x: x["pub_date"] or datetime.min, reverse=True)[:20]
-    commercial_times_articles = sorted(commercial_times_articles, key=lambda x: x["pub_date"] or datetime.min, reverse=True)[:20]
-    other_articles = sorted(other_articles, key=lambda x: x["pub_date"] or datetime.min, reverse=True)[:30]
-    
-    prompt_articles = economic_daily_articles + commercial_times_articles + other_articles
-    
+    economic_daily_articles = sorted(
+        economic_daily_articles, key=lambda x: x["pub_date"] or datetime.min, reverse=True)[:20]
+    commercial_times_articles = sorted(
+        commercial_times_articles, key=lambda x: x["pub_date"] or datetime.min, reverse=True)[:20]
+    other_articles = sorted(
+        other_articles, key=lambda x: x["pub_date"] or datetime.min, reverse=True)[:30]
+
+    prompt_articles = economic_daily_articles + \
+        commercial_times_articles + other_articles
+
     if not prompt_articles:
         return jsonify({"error": f"在過去 {timeframe_hours} 小時內沒有找到任何新聞，請嘗試擴大時間範圍（如 24 小時）。"}), 404
-        
+
     # Format articles for prompt
     formatted_list = ""
     for idx, art in enumerate(prompt_articles):
@@ -315,7 +342,7 @@ def get_news():
 
     # Gemini REST API Call
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    
+
     payload = {
         "contents": [
             {
@@ -388,19 +415,21 @@ def get_news():
             }
         }
     }
-    
+
     headers = {
         "Content-Type": "application/json"
     }
-    
+
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=90)
+            response = requests.post(
+                url, json=payload, headers=headers, timeout=90)
             if response.status_code == 200:
                 break
             elif response.status_code in (503, 429):
-                print(f"Gemini API Overloaded ({response.status_code}). Retrying {attempt+1}/{max_retries} in {2**attempt}s...")
+                print(
+                    f"Gemini API Overloaded ({response.status_code}). Retrying {attempt+1}/{max_retries} in {2**attempt}s...")
                 time.sleep(2 ** attempt)
                 continue
             else:
@@ -413,24 +442,25 @@ def get_news():
             time.sleep(2 ** attempt)
     else:
         return jsonify({"error": f"Gemini API 目前伺服器過度擁擠 (503 High Demand)，系統已自動重試 {max_retries} 次仍失敗，請稍後再試。"}), 503
-            
+
         result = response.json()
-        
+
         # Extract text from response
         try:
             candidates = result.get("candidates", [])
             if not candidates:
                 return jsonify({"error": "Gemini API 未回傳任何候選結果"}), 502
-            
+
             content_text = candidates[0]["content"]["parts"][0]["text"]
-            
+
             # Post-process: Decode only the URLs chosen by Gemini to save time
             try:
                 result_data = json.loads(content_text)
-                
+
                 # Inject real-time scraped data
                 if "taiwan_market" in result_data:
-                    result_data["taiwan_market"]["institutional_trading"] = fetch_twse_data()
+                    result_data["taiwan_market"]["institutional_trading"] = fetch_twse_data(
+                    )
                 if "us_market" in result_data:
                     result_data["us_market"]["indices_performance"] = fetch_us_indices()
 
@@ -439,21 +469,24 @@ def get_news():
                         for article in result_data[key]:
                             orig_link = article.get("link", "")
                             if orig_link:
-                                article["link"] = decode_google_news_url(orig_link)
+                                article["link"] = decode_google_news_url(
+                                    orig_link)
                 content_text = json.dumps(result_data, ensure_ascii=False)
             except Exception as e:
                 print(f"Error decoding URLs in JSON: {e}")
-            
+
             # The API returns structured JSON based on our responseSchema
             return content_text, 200, {'Content-Type': 'application/json'}
-            
+
         except (KeyError, IndexError) as e:
             return jsonify({"error": f"解析 Gemini API 回傳內容時發生錯誤: {str(e)}", "raw_response": result}), 502
-            
-    except requests.exceptions.Timeout:
-        return jsonify({"error": "Gemini API 請求逾時，請稍後再試。"}), 504
-    except Exception as e:
-        return jsonify({"error": f"伺服器內部錯誤: {str(e)}"}), 500
+
+        except requests.exceptions.Timeout:
+            return jsonify({"error": "Gemini API 請求逾時，請稍後再試。"}), 504
+
+        except Exception as e:
+            return jsonify({"error": f"伺服器內部錯誤: {str(e)}"}), 500
+
 
 if __name__ == '__main__':
     # Start on port 8010 to avoid conflicting standard ports
