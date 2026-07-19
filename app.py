@@ -27,7 +27,7 @@ FEEDS = {
     },
     "commercial_times": {
         "name": "工商時報",
-        "url": "https://www.ctee.com.tw/rss"
+        "url": "https://news.google.com/rss/search?q=site:ctee.com.tw&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
     },
     "global_market": {
         "name": "國際與美股財經",
@@ -324,7 +324,7 @@ def get_news():
 2. **來源限制（強制要求）**：
    - 【必須】挑選至少一則來自「經濟日報」的新聞。
    - 【必須】挑選至少一則來自「工商時報」的新聞。
-   - 警告：即使您認為該報社的新聞不符合上述的完美標準，也絕對必須從中挑出相對最重要的一則，絕不允許讓任何一個報社板塊為空 (Empty Array)！若真的沒有符合標準的新聞，請隨意挑選一則該報社的新聞填入，嚴禁留白！
+   - 警告：若清單中真的完全沒有該報社的新聞，請返回空陣列 (Empty Array)，絕對不可拿其他來源或英文新聞魚目混珠！
 3. **時效性**：
    - 原則上僅篩選過去 {timeframe_hours} 小時內的新聞。{monday_rule}
 4. **輸出格式與語言**：
