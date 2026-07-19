@@ -443,49 +443,49 @@ def get_news():
     else:
         return jsonify({"error": f"Gemini API 目前伺服器過度擁擠 (503 High Demand)，系統已自動重試 {max_retries} 次仍失敗，請稍後再試。"}), 503
 
-        result = response.json()
+    result = response.json()
 
-        # Extract text from response
+    # Extract text from response
+    try:
+        candidates = result.get("candidates", [])
+        if not candidates:
+            return jsonify({"error": "Gemini API 未回傳任何候選結果"}), 502
+
+        content_text = candidates[0]["content"]["parts"][0]["text"]
+
+        # Post-process: Decode only the URLs chosen by Gemini to save time
         try:
-            candidates = result.get("candidates", [])
-            if not candidates:
-                return jsonify({"error": "Gemini API 未回傳任何候選結果"}), 502
+            result_data = json.loads(content_text)
 
-            content_text = candidates[0]["content"]["parts"][0]["text"]
+            # Inject real-time scraped data
+            if "taiwan_market" in result_data:
+                result_data["taiwan_market"]["institutional_trading"] = fetch_twse_data(
+                )
+            if "us_market" in result_data:
+                result_data["us_market"]["indices_performance"] = fetch_us_indices()
 
-            # Post-process: Decode only the URLs chosen by Gemini to save time
-            try:
-                result_data = json.loads(content_text)
-
-                # Inject real-time scraped data
-                if "taiwan_market" in result_data:
-                    result_data["taiwan_market"]["institutional_trading"] = fetch_twse_data(
-                    )
-                if "us_market" in result_data:
-                    result_data["us_market"]["indices_performance"] = fetch_us_indices()
-
-                for key in ["economic_daily_news", "commercial_times_news"]:
-                    if key in result_data:
-                        for article in result_data[key]:
-                            orig_link = article.get("link", "")
-                            if orig_link:
-                                article["link"] = decode_google_news_url(
-                                    orig_link)
-                content_text = json.dumps(result_data, ensure_ascii=False)
-            except Exception as e:
-                print(f"Error decoding URLs in JSON: {e}")
-
-            # The API returns structured JSON based on our responseSchema
-            return content_text, 200, {'Content-Type': 'application/json'}
-
-        except (KeyError, IndexError) as e:
-            return jsonify({"error": f"解析 Gemini API 回傳內容時發生錯誤: {str(e)}", "raw_response": result}), 502
-
-        except requests.exceptions.Timeout:
-            return jsonify({"error": "Gemini API 請求逾時，請稍後再試。"}), 504
-
+            for key in ["economic_daily_news", "commercial_times_news"]:
+                if key in result_data:
+                    for article in result_data[key]:
+                        orig_link = article.get("link", "")
+                        if orig_link:
+                            article["link"] = decode_google_news_url(
+                                orig_link)
+            content_text = json.dumps(result_data, ensure_ascii=False)
         except Exception as e:
-            return jsonify({"error": f"伺服器內部錯誤: {str(e)}"}), 500
+            print(f"Error decoding URLs in JSON: {e}")
+
+        # The API returns structured JSON based on our responseSchema
+        return content_text, 200, {'Content-Type': 'application/json'}
+
+    except (KeyError, IndexError) as e:
+        return jsonify({"error": f"解析 Gemini API 回傳內容時發生錯誤: {str(e)}", "raw_response": result}), 502
+
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "Gemini API 請求逾時，請稍後再試。"}), 504
+
+    except Exception as e:
+        return jsonify({"error": f"伺服器內部錯誤: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
