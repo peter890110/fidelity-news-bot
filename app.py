@@ -150,10 +150,10 @@ def fetch_twse_data():
 
 def fetch_us_indices():
     tickers = {
-        "^DJI": "道瓊指數",
-        "^IXIC": "那斯達克",
-        "^GSPC": "S&P 500",
-        "^SOX": "費城半導體"
+        "^DJI": "道瓊工業指數",
+        "^IXIC": "納斯達克指數",
+        "^GSPC": "S&P 500指數",
+        "^SOX": "費城半導體指數"
     }
     results = []
     for symbol, name in tickers.items():
@@ -168,7 +168,7 @@ def fetch_us_indices():
                     prev_close = float(hist['Close'].iloc[-2])
                     pct_change = ((last_close - prev_close) / prev_close) * 100
                     sign = "上漲" if pct_change > 0 else "下跌"
-                    results.append(f"{name}{sign}{abs(pct_change):.2f}%")
+                    results.append(f"{name}{sign}：{abs(pct_change):.2f}％")
                 else:
                     results.append(f"{name}：無資料")
                 success = True

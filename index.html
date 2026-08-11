@@ -1237,7 +1237,7 @@
             if (data.us_market) {
                 text += "■ <美股盤後>\n\n";
                 if (data.us_market.indices_performance) {
-                    text += `  - 主要指數表現：${data.us_market.indices_performance.join('；')}。\n`;
+                    text += `  - 主要指數表現：${data.us_market.indices_performance.join('; ')}\n`;
                 }
                 text += `  - ${data.us_market.summary}\n\n`;
             }
