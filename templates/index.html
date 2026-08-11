@@ -1189,13 +1189,9 @@
                 usCard.className = 'news-card';
                 let usHtml = `<div class="badge-container" style="margin-bottom: 1rem;"><span class="category-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">美股盤後</span></div>`;
                 usHtml += `<h3 class="headline" style="margin-top: 1rem;">◼ 四大指數表現</h3>`;
-                usHtml += `<ul style="color: #e5e7eb; padding-left: 1.5rem; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">`;
                 if (newsData.us_market.indices_performance) {
-                    newsData.us_market.indices_performance.forEach(point => {
-                        usHtml += `<li>${point}</li>`;
-                    });
+                    usHtml += `<p style="color: #e5e7eb; margin-top: 0.5rem; line-height: 1.6;">主要指數表現：${newsData.us_market.indices_performance.join('; ')}</p>`;
                 }
-                usHtml += `</ul>`;
                 usHtml += `<h3 class="headline" style="margin-top: 1rem;">◼ 盤後重點統整</h3>`;
                 usHtml += `<p style="color: #d1d5db; margin-top: 0.5rem; line-height: 1.6;">${newsData.us_market.summary || ''}</p>`;
                 usCard.innerHTML = usHtml;
@@ -1232,42 +1228,40 @@
 
         // Generate Formatted Text Report
         function generateReportText(data) {
-            let text = "";
+            let text = "[Internal Use Only]\nHi all,\nPlease check the daily news and market report, thank you.\n\n[Post-market Report]\n";
             
+            if (data.us_market) {
+                text += "■ <美股盤後>\n\n";
+                if (data.us_market.indices_performance) {
+                    text += `主要指數表現：${data.us_market.indices_performance.join('; ')}\n`;
+                }
+                text += `  - ${data.us_market.summary}\n\n`;
+            }
+
             if (data.taiwan_market) {
-                text += "[台股盤後]\n";
-                text += "◼ 三大法人買賣超\n";
+                text += "■ <台股盤後>\n\n";
                 if (data.taiwan_market.institutional_trading) {
                     data.taiwan_market.institutional_trading.forEach(point => {
                         text += `  - ${point}\n`;
                     });
                 }
-                text += `◼ 盤後重點統整\n  ${data.taiwan_market.summary}\n\n`;
+                text += `  - ${data.taiwan_market.summary}\n\n`;
             }
 
-            if (data.us_market) {
-                text += "[美股盤後]\n";
-                text += "◼ 四大指數表現\n";
-                if (data.us_market.indices_performance) {
-                    data.us_market.indices_performance.forEach(point => {
-                        text += `  - ${point}\n`;
-                    });
-                }
-                text += `◼ 盤後重點統整\n  ${data.us_market.summary}\n\n`;
-            }
+            text += "[News Headlines]\n";
 
             const appendNewsText = (title, newsArray) => {
                 if (!newsArray || newsArray.length === 0) return;
-                text += `[${title}]\n`;
+                text += `■ ${title}\n\n`;
                 newsArray.forEach(art => {
-                    text += `- ${art.headline}\n`;
+                    text += `  - ${art.headline}\n`;
                     if (art.points) {
                         art.points.forEach((point, idx) => {
-                            text += `  ${idx + 1}. ${point}\n`;
+                            text += `    ${idx + 1}. ${point}\n`;
                         });
                     }
+                    text += "\n";
                 });
-                text += "\n";
             };
 
             appendNewsText('經濟日報', data.economic_daily_news);
