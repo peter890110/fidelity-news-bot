@@ -420,7 +420,7 @@ def get_news():
         "Content-Type": "application/json"
     }
 
-    max_retries = 3
+    max_retries = 5
     for attempt in range(max_retries):
         try:
             response = requests.post(
@@ -441,7 +441,7 @@ def get_news():
                 return jsonify({"error": f"呼叫 Gemini API 發生例外錯誤: {str(e)}"}), 500
             time.sleep(2 ** attempt)
     else:
-        return jsonify({"error": f"Gemini API 目前伺服器過度擁擠 (503 High Demand)，系統已自動重試 {max_retries} 次仍失敗，請稍後再試。"}), 503
+        return jsonify({"error": f"Gemini API 目前伺服器極度擁擠 (503 High Demand)，系統已在背景努力重試 {max_retries} 次仍被 Google 拒絕，請您稍等一分鐘後再試。"}), 503
 
     result = response.json()
 
