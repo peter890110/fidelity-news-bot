@@ -6,12 +6,25 @@ function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className
 function icon(name){const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('aria-hidden','true');const u=document.createElementNS('http://www.w3.org/2000/svg','use');u.setAttribute('href',`#i-${name}`);s.append(u);return s;}
 function link(url,label,cls='source-link'){const a=el('a',cls,label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.append(icon('external'));return a;}
 function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,3300);}
+function money(value){return Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function net(value){return value==null?'買賣超待公布':`${value<0?'賣超':value>0?'買超':'買賣超'}${money(Math.abs(value))}億元`;}
+function marketLines(id,market){
+ if(id==='us')return [
+  '主要指數表現：'+market.indices.map(m=>`${m.name}${m.changePct>0?'上漲':m.changePct<0?'下跌':'持平'}：${Math.abs(m.changePct).toFixed(2)}%`).join('；')+'。',
+  '美股最新交易日走勢，'+market.summary
+ ];
+ const order=['外資','自營商','投信'];
+ const values=new Map((market.flow||[]).map(x=>[x.name,x.value]));
+ return [
+  `成交量${money(market.turnoverBillions)}億元；三大法人合計${net(market.netFlowBillions)}。`,
+  '觀察三大法人今天籌碼動向，'+order.map(name=>`${name}${net(values.get(name))}`).join('；')+'。',
+  '台股最新交易日走勢，'+market.summary
+ ];
+}
 function renderMarket(id,market){
  const box=$(id),area=box.querySelector('.market-content');area.replaceChildren();box.querySelector('.session-date').textContent=`${market.sessionDate} 收盤${id==='us'?'・美東':''}`;
- const metrics=el('div','market-metrics');
- market.metrics.forEach(m=>{const cell=el('div','metric');cell.append(el('div','metric-label',m.label),el('div','metric-value',m.value),el('div',`metric-change ${m.direction}`,m.change));metrics.append(cell)});area.append(metrics);
- if(market.flow){area.append(el('h3','',market.subheading));const flows=el('div','flows');market.flow.forEach(f=>{const row=el('div','',f.name);row.append(el('strong',f.value<0?'down':'up',`${f.value<0?'賣超':'買超'} ${Math.abs(f.value).toLocaleString('en-US',{minimumFractionDigits:2})} 億元`));flows.append(row)});area.append(flows)}
- area.append(el('h3','','盤後重點統整'),el('p','market-summary',market.summary),link(market.url,`${market.sourceLabel}・來源`));
+ const list=el('ul','market-list');marketLines(id,market).forEach((text,i)=>{const li=el('li',i===marketLines(id,market).length-1?'market-recap':'',text);if(text.includes('待公布'))li.classList.add('market-pending');list.append(li)});area.append(list);
+ const foot=el('div','market-sources');(market.sources||[{label:market.sourceLabel,url:market.url}]).forEach(s=>foot.append(link(s.url,s.label+'・來源')));area.append(foot);
 }
 function renderArticles(key,articles){
  const container=$(key);container.replaceChildren();
@@ -55,7 +68,7 @@ async function refresh(){
 }
 function reportText(){
  const lines=['AI 財經新聞分析助手',`報告日期：${current.reportDate}`,''];
- for(const key of ['taiwan','us']){const m=current.markets[key];lines.push(m.label+'｜'+m.sessionDate,m.metrics.map(v=>`${v.label}：${v.value} ${v.change}`).join('\n'),m.summary,`來源：${m.url}`,'')}
+ for(const key of ['taiwan','us']){const m=current.markets[key];lines.push(m.label+'｜'+m.sessionDate,...marketLines(key,m).map(text=>'• '+text),...(m.sources||[{label:m.sourceLabel,url:m.url}]).map(s=>`來源：${s.label} ${s.url}`),'')}
  for(const name of ['經濟日報','工商時報']){lines.push(name,'');current.articles.filter(a=>a.source===name).forEach(a=>{lines.push(a.title,`發布：${time(a.publishedAt)}`,...a.points.map((p,i)=>`${i+1}. ${p.heading}\n${p.text}`),`來源：${a.url}`,'')})}
  return lines.join('\n\n');
 }

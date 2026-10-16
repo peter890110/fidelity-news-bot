@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createMacroBrief, topicFor } from './summary.js';
+import { fetchInstitutional } from './market-data.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
@@ -11,6 +12,17 @@ const HOST = process.env.HOST || (process.env.RENDER ? '0.0.0.0' : '127.0.0.1');
 const seed = JSON.parse(await fs.readFile(path.join(root, 'report.json'), 'utf8'));
 let report = structuredClone(seed);
 try { report = JSON.parse(await fs.readFile(path.join(root, 'latest.json'), 'utf8')); } catch {}
+report.markets = structuredClone(seed.markets);
+report.layoutVersion = seed.layoutVersion;
+let flowChecking = null;
+let lastFlowCheck = 0;
+async function checkMarketFlows() {
+ if(flowChecking)return flowChecking;
+ if(Date.now()-lastFlowCheck<60000)return;
+ lastFlowCheck=Date.now();
+ flowChecking=fetchInstitutional(report.markets.taiwan).then(m=>{report.markets.taiwan=m;}).catch(()=>{}).finally(()=>{flowChecking=null;});
+ return flowChecking;
+}
 let refreshing = null;
 let lastRefreshStarted = 0;
 const sources = [{ key:'udn', name:'經濟日報', domain:'money.udn.com' }, { key:'ctee', name:'工商時報', domain:'ctee.com.tw' }];
@@ -99,7 +111,7 @@ async function updateSource(source,hours) {
   return {articles:checked,discovered:items.length,candidates:ranked.slice(0,5).map(a=>({title:a.title,url:a.url,publishedAt:a.publishedAt,source:source.name}))};
 }
 async function refreshReport(hours) {
-  const result=await Promise.allSettled(sources.map(s=>updateSource(s,hours)));
+  const result=await Promise.allSettled([...sources.map(s=>updateSource(s,hours)),checkMarketFlows()]);
   const notes=[];let discovered=0;let candidates=[];
   const articles=sources.flatMap((s,i)=>{
     if(result[i].status==='fulfilled'){discovered+=result[i].value.discovered;candidates.push(...result[i].value.candidates);return result[i].value.articles;}
@@ -120,14 +132,14 @@ async function handle(req,res) {
  const u=new URL(req.url,'http://localhost');
  if(u.pathname==='/healthz'&&req.method==='GET'){send(res,200,{status:'ok'});return;}
  if(u.pathname==='/robots.txt'&&req.method==='GET'){send(res,200,'User-agent: *\nDisallow: /\n','text/plain; charset=utf-8');return;}
- if(u.pathname==='/api/report'&&req.method==='GET'){send(res,200,report);return;}
+ if(u.pathname==='/api/report'&&req.method==='GET'){await checkMarketFlows();send(res,200,report);return;}
  if(u.pathname==='/api/refresh'&&req.method==='POST'){
   const n=Number(u.searchParams.get('hours')||24);const hours=[12,24,72,168].includes(n)?n:24;
   if(!refreshing&&Date.now()-lastRefreshStarted<60000){send(res,200,{...report,rateLimited:true});return;}
   if(!refreshing){lastRefreshStarted=Date.now();refreshing=refreshReport(hours).finally(()=>{refreshing=null;});}
   send(res,200,await refreshing);return;
  }
- const file=u.pathname==='/'?'index.html':u.pathname.slice(1);
+ const file=['/','/market-v2'].includes(u.pathname)?'index.html':u.pathname.slice(1);
  const types={'index.html':'text/html; charset=utf-8','style.css':'text/css; charset=utf-8','app.js':'text/javascript; charset=utf-8'};
  if(req.method!=='GET'||!types[file]){send(res,404,{error:'找不到頁面'});return;}
  send(res,200,await fs.readFile(path.join(root,file),'utf8'),types[file]);
