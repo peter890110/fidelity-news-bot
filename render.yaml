@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: fidelity-macro-news-preview
+    runtime: node
+    plan: free
+    region: singapore
+    branch: codex/macro-news-cloud
+    rootDir: prototype
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24
