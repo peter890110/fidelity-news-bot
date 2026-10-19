@@ -7,8 +7,17 @@ function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className
 function icon(name){const s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('aria-hidden','true');const u=document.createElementNS('http://www.w3.org/2000/svg','use');u.setAttribute('href',`#i-${name}`);s.append(u);return s;}
 function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').hidden=false;toastTimer=setTimeout(()=>$('toast').hidden=true,3300);}
 async function copyText(text,label){
- try{await navigator.clipboard.writeText(text);toast(`已複製${label}`);}
- catch{$('copy-text').value=text;$('copy-dialog').showModal();$('copy-text').focus();$('copy-text').select();}
+ const focused=document.activeElement;
+ const selection=document.createElement('textarea');
+ selection.value=text;selection.readOnly=true;selection.setAttribute('aria-hidden','true');
+ Object.assign(selection.style,{position:'fixed',left:'-9999px',top:'0'});
+ document.body.append(selection);selection.select();
+ let copied=false;
+ try{copied=document.execCommand('copy');}catch{}
+ selection.remove();focused?.focus({preventScroll:true});
+ if(!copied){try{await navigator.clipboard.writeText(text);copied=true;}catch{}}
+ if(copied)toast(`已複製${label}`);
+ else{$('copy-text').value=text;$('copy-dialog').showModal();$('copy-text').focus();$('copy-text').select();}
 }
 function copyButton(text,label){const button=el('button','copy-brief',label);button.type='button';button.append(icon('copy'));button.addEventListener('click',()=>copyText(text(),label.replace('複製','')));return button;}
 function renderMarket(id,market){
