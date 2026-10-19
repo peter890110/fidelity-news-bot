@@ -1,5 +1,5 @@
 {
-  "reportDate": "2026-10-16",
+  "reportDate": "2026-10-19",
   "preparedAt": "2026-10-16T04:07:20.848170+00:00",
   "articles": [
     {
@@ -111,77 +111,120 @@
     "taiwan": {
       "label": "台股盤後",
       "sessionDate": "2026-10-16",
+      "close": 47111.26,
+      "change": 141.39,
+      "turnoverBillions": 9938.1483009,
+      "changePct": 0.3010227620387282,
+      "flowPublished": true,
+      "netFlowBillions": -685.13664272,
       "flow": [
         {
           "name": "外資",
-          "value": null
+          "value": -461.47162837
         },
         {
           "name": "自營商",
-          "value": null
+          "value": -334.14008405
         },
         {
           "name": "投信",
-          "value": null
+          "value": 110.4750697
         }
       ],
+      "flowDate": "2026-10-16",
       "summary": "10月16日加權指數收在47,111.26點，上漲141.39點、漲幅0.30%，呈現前一日急跌後的反彈。指數盤中最高觸及47,520.60點，隨後漲幅收斂，顯示高檔仍有賣壓。台積電下跌20元至2,420元，半導體類股回落，抑制指數上攻；金融、航運與電腦週邊等族群則提供支撐。整體盤勢雖站回47,000點，但反彈廣度與權值股表現仍有差異，後續宜觀察法人賣壓是否收斂、台幣是否止貶，以及主要電子股能否帶動量價回穩。",
       "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20261016&type=ALL",
-      "sourceLabel": "臺灣證券交易所・10/16收盤",
-      "turnoverBillions": 9359.5993713,
-      "flowPublished": false,
-      "flowDate": "2026-10-16",
-      "netFlowBillions": null,
+      "sourceLabel": "臺灣證券交易所",
       "sources": [
         {
           "label": "證交所收盤統計",
           "url": "https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20261016&type=ALL"
-        },
-        {
-          "label": "證交所三大法人統計",
-          "url": "https://www.twse.com.tw/fund/BFI82U?response=json&dayDate=20261016&type=day"
-        },
-        {
-          "label": "經濟日報收盤報導",
-          "url": "https://money.udn.com/money/story/12509/9819105"
         }
-      ]
+      ],
+      "verifiedFor": "2026-10-19",
+      "status": "verified",
+      "checkedAt": "2026-10-19T01:35:44.459Z",
+      "flowCheckedAt": "2026-10-19T01:35:46.570Z"
     },
     "us": {
       "label": "美股盤後",
-      "sessionDate": "2026-10-15",
-      "summary": "美東10月15日主要指數多收紅，市場一方面消化美國通膨數據升溫，另一方面擔憂AI資本支出與融資負擔，資金轉向科技以外標的。道瓊領漲，標普500與納斯達克小幅收高，費城半導體則持續收跌，反映類股輪動而非全面回升。台積電ADR下跌1.80%，輝達下跌1.84%，顯示晶片與AI相關族群壓力未除。後續應觀察聯準會利率預期、美債殖利率及大型科技公司財報，確認傳統類股買盤能否延續，以及半導體賣壓何時緩和。",
-      "url": "https://money.udn.com/money/story/123398/9818064",
-      "sourceLabel": "經濟日報／中央社・10/16 05:06",
+      "sessionDate": "2026-10-16",
       "indices": [
         {
           "name": "道瓊工業指數",
-          "changePct": 1.08
+          "changePct": -0.34,
+          "close": 52002.41
         },
         {
           "name": "納斯達克指數",
-          "changePct": 0.08
+          "changePct": -2.14,
+          "close": 26140.04
         },
         {
           "name": "S&P 500指數",
-          "changePct": 0.33
+          "changePct": -1.09,
+          "close": 7659.44
         },
         {
           "name": "費城半導體指數",
-          "changePct": -0.88
+          "changePct": -3.83,
+          "close": 11137.289
         }
       ],
+      "summary": "美東10月16日美股全面收黑，科技股反彈乏力，市場對人工智慧投資的疑慮延續。道瓊收在52,002.41點，下跌175.28點；標普500收7,659.44點，納斯達克收26,140.04點，費城半導體收11,137.29點。納指與費半跌幅分別超過2%與3%，明顯重於道瓊，顯示科技及晶片股仍是賣壓較集中的區塊。四大指數同步走低，也意味前一交易日部分指數的反彈未能延續；後續可觀察科技股承接力道與AI相關投資消息，判斷市場情緒是否回穩。",
+      "verifiedFor": "2026-10-19",
+      "status": "verified",
+      "checkedAt": "2026-10-19T01:35:44.459Z",
       "sources": [
         {
-          "label": "經濟日報／中央社・美股收盤",
-          "url": "https://money.udn.com/money/story/123398/9818064"
+          "label": "道瓊工業指數",
+          "url": "https://finance.yahoo.com/quote/%5EDJI/history/"
         },
         {
-          "label": "經濟日報／中央社・科技股表現",
-          "url": "https://money.udn.com/money/story/5607/9818215"
+          "label": "納斯達克指數",
+          "url": "https://finance.yahoo.com/quote/%5EIXIC/history/"
+        },
+        {
+          "label": "S&P 500指數",
+          "url": "https://finance.yahoo.com/quote/%5EGSPC/history/"
+        },
+        {
+          "label": "費城半導體指數",
+          "url": "https://finance.yahoo.com/quote/%5ESOX/history/"
         }
-      ]
+      ],
+      "researchedClose": {
+        "sessionDate": "2026-10-16",
+        "indices": [
+          {
+            "name": "道瓊工業指數",
+            "changePct": -0.34,
+            "close": 52002.41
+          },
+          {
+            "name": "納斯達克指數",
+            "changePct": -2.14,
+            "close": 26140.04
+          },
+          {
+            "name": "S&P 500指數",
+            "changePct": -1.09,
+            "close": 7659.44
+          },
+          {
+            "name": "費城半導體指數",
+            "changePct": -3.83,
+            "close": 11137.289
+          }
+        ],
+        "sources": [
+          {
+            "label": "中央社／2026年10月16日美股收盤",
+            "url": "https://money.udn.com/money/story/123398/9820282"
+          }
+        ]
+      }
     }
   },
-  "layoutVersion": "market-2"
+  "layoutVersion": "market-3"
 }

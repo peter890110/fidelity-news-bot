@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080a0e"><title>AI 財經新聞分析助手</title>
-<link rel="stylesheet" href="/style.css?v=market-2">
+<link rel="stylesheet" href="/style.css?v=market-3">
 </head>
 <body>
 <svg aria-hidden="true" class="icon-defs"><defs>
@@ -28,9 +28,10 @@
 <section id="economic" class="panel pink" aria-label="經濟日報"><div class="section-top"><h2 class="pill">經濟日報</h2><span>精選 2 篇</span></div><div class="articles" id="udn"></div></section>
 <section id="commercial" class="panel gold" aria-label="工商時報"><div class="section-top"><h2 class="pill">工商時報</h2><span>精選 2 篇</span></div><div class="articles" id="ctee"></div></section>
 <div id="filter-empty" class="filter-empty" hidden>這份報告目前沒有此主題的新聞，請選擇其他選文條件。</div>
-<details id="discovery" hidden><summary>查看本次查詢發現的其他新聞 <span id="discovered-count"></span></summary><div id="candidates"></div></details>
-<footer><p>新聞重點依原文整理；標註「總經解讀／延伸觀察」的內容為分析。盤後資料附交易日期，盤中新聞另行註明。</p><p>財經新聞試作版・新聞版權屬原出版者</p></footer>
+
+<footer><p>盤後採前一個已收盤交易日，依台美各自交易日期更新。</p><p>財經新聞試作版</p></footer>
+<dialog id="copy-dialog"><form method="dialog"><h2>複製文字</h2><p>文字已選取，請按 ⌘C 或 Ctrl+C 複製。</p><textarea id="copy-text" readonly aria-label="可複製的報告文字"></textarea><button class="secondary">關閉</button></form></dialog>
 <div id="toast" role="status" hidden></div>
 </main>
-<script type="module" src="/app.js?v=market-2"></script>
+<script type="module" src="/app.js?v=market-3"></script>
 </body></html>

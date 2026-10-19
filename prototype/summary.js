@@ -62,7 +62,7 @@ export function createMacroBrief(title,paragraphs) {
  const topic=topicFor(title,body),data=metrics(body);
  if(!data.length)throw new Error('沒有可核對的總經數據');
  const headings=['關鍵數據與事件','總經傳導與影響','後續觀察與風險'];
- const points=interpretation[topic].map((t,i)=>({heading:headings[i],text:fit(`${i===0?'原文數據：'+data.slice(0,2).join('；')+'。':i===1&&data.length>2?'另見數據：'+data.slice(2,4).join('；')+'。':''}總經觀察：${t}`,'以上屬於依公開資訊所做的觀察，仍須隨後續發布的資料修正。')}));
+ const points=interpretation[topic].map((t,i)=>({heading:headings[i],text:fit(`${i===0?data.slice(0,2).join('；')+'。':i===1&&data.length>2?data.slice(2,4).join('；')+'。':''}${t}`,'以上屬於依公開資訊所做的觀察，仍須隨後續發布的資料修正。')}));
  if(points.some(p=>[...p.text].length<200||[...p.text].length>300))throw new Error('摘要字數未符合要求');
  return {points,topic,mode:'全文數據與規則解讀',preparedAt:new Date().toISOString()};
 }
