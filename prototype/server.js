@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createMacroBrief, topicFor } from './summary.js';
 import { refreshMarkets, dateIn } from './market-data.js';
+import {NEWS_HOURS,isWithinNewsWindow,isFinanceNews,freshArticles,enforceNewsWindow} from './news-policy.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
@@ -15,6 +16,7 @@ try { report = JSON.parse(await fs.readFile(path.join(root, 'latest.json'), 'utf
 // Keep persisted sessions across restarts. Re-check dates on every new reporting day.
 if(report.layoutVersion!==seed.layoutVersion)report.markets=structuredClone(seed.markets);
 report.layoutVersion=seed.layoutVersion;
+report=enforceNewsWindow(report);
 let marketChecking=null;
 let lastMarketCheck=0;
 let lastMarketDay='';
@@ -41,7 +43,9 @@ export function clean(s='') {
 const xmlTag = (s,n) => clean(s.match(new RegExp(`<${n}[^>]*>([\\s\\S]*?)<\\/${n}>`))?.[1] || '');
 const canonical = u => { const x = new URL(u); x.search='';x.hash='';return x.href; };
 async function fetchText(url,options={}) {
-  const r = await fetch(url,{...options,signal:AbortSignal.timeout(10000),headers:{'user-agent':UA,...options.headers}});
+  const {deadline,...request}=options;
+  const timeout=Math.max(1,Math.min(8000,(deadline||Date.now()+8000)-Date.now()));
+  const r = await fetch(url,{...request,signal:AbortSignal.timeout(timeout),headers:{'user-agent':UA,...options.headers}});
   if (!r.ok) throw new Error(`來源回應 ${r.status}`);
   return r.text();
 }
@@ -58,75 +62,80 @@ export function parseArticle(html,url) {
   if (date && !/[Z+]|-\d\d:\d\d$/.test(date.slice(10))) date=date.replace(' ','T')+'+08:00';
   return { title:meta(html,'og:title').split(' | ')[0], paragraphs, body:paragraphs.join('\n'), publishedAt:date, hash:createHash('sha256').update(paragraphs.join('\n')).digest('hex') };
 }
-async function feed(source) {
-  const q=`site:${source.domain} (央行 OR 通膨 OR 利率 OR 匯率 OR GDP OR IMF OR 經濟成長) when:7d`;
-  const xml=await fetchText(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`);
-  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m=>({title:xmlTag(m[1],'title').replace(/\s*-\s*工商時報$/,'').replace(/\s*-\s*經濟日報$/,''),url:xmlTag(m[1],'link'),publishedAt:xmlTag(m[1],'pubDate'),sourceKey:source.key,source:source.name})).filter(x=>x.title&&x.url&&Number.isFinite(Date.parse(x.publishedAt))&&Date.parse(x.publishedAt)<=Date.now()+60000);
+async function feed(source,deadline) {
+  const q=`site:${source.domain} (央行 OR 通膨 OR 利率 OR 匯率 OR GDP OR IMF OR 經濟成長) when:6h`;
+  const xml=await fetchText(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`,{deadline});
+  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m=>({title:xmlTag(m[1],'title').replace(/\s*-\s*工商時報$/,'').replace(/\s*-\s*經濟日報$/,''),url:xmlTag(m[1],'link'),publishedAt:xmlTag(m[1],'pubDate'),sourceKey:source.key,source:source.name})).filter(x=>x.title&&x.url&&isWithinNewsWindow(x.publishedAt)&&isFinanceNews(x.title));
 }
-async function resolveLink(url) {
+async function resolveLink(url,deadline) {
   if (!url.startsWith('https://news.google.com/')) return canonical(url);
   const id=new URL(url).pathname.split('/').at(-1);
-  const html=await fetchText(`https://news.google.com/rss/articles/${id}?hl=zh-TW&gl=TW&ceid=TW:zh-Hant`);
+  const html=await fetchText(`https://news.google.com/rss/articles/${id}?hl=zh-TW&gl=TW&ceid=TW:zh-Hant`,{deadline});
   const sig=html.match(/data-n-a-sg="([^"]+)"/)?.[1],ts=html.match(/data-n-a-ts="([^"]+)"/)?.[1];
   if (!sig||!ts) throw new Error('無法取得新聞原文連結');
   const ctx=[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0];
   const envelope=[[["Fbv4je",JSON.stringify(['garturlreq',ctx,id,Number(ts),sig]),null,'0']]];
-  const raw=await fetchText('https://news.google.com/_/DotsSplashUi/data/batchexecute',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({'f.req':JSON.stringify(envelope)}).toString()});
+  const raw=await fetchText('https://news.google.com/_/DotsSplashUi/data/batchexecute',{deadline,method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({'f.req':JSON.stringify(envelope)}).toString()});
   const rows=JSON.parse(raw.slice(raw.indexOf('\n\n')+2));
   const row=rows.find(x=>x[0]==='wrb.fr'&&x[1]==='Fbv4je');
   if (!row) throw new Error('無法解析原文連結');
   return canonical(JSON.parse(row[2])[1]);
 }
-function score(a,hours) {
-  const age=(Date.now()-Date.parse(a.publishedAt))/3600000;
-  let n=(age<=hours?35:0)+Math.max(0,24-age)*.4;
-  for (const t of ['央行','通膨','利率','匯率','經濟成長','GDP','IMF','PPI','CPI','貿易','出口']) if(a.title.includes(t)) n+=5;
-  for (const t of ['ETF','配息','基金','概念股','飆股','房價','抽獎','ASIC','營收']) if(a.title.includes(t))n-=15;
-  return n;
+function score(a) {
+ const age=(Date.now()-Date.parse(a.publishedAt))/3600000;
+ let n=Math.max(0,NEWS_HOURS-age);
+ for(const t of ['央行','通膨','利率','匯率','經濟成長','GDP','IMF','PPI','CPI','貿易','出口'])if(a.title.includes(t))n+=5;
+ return n;
 }
-function sameStory(a,b) {return a.title.replace(/[\s\p{P}\p{S}]/gu,'').includes(b.originalTitle.replace(/[\s\p{P}\p{S}]/gu,''));}
-async function updateSource(source,hours) {
-  const items=await feed(source);
-  const old=report.articles.filter(x=>x.sourceKey===source.key);
-  // Keep the complete, researched selection while it is still inside the requested window.
-  const freshKnown=old.filter(x=>Date.now()-Date.parse(x.publishedAt)<=hours*3600000);
-  const ranked=items.sort((a,b)=>score(b,hours)-score(a,hours));
-  const selected=[...freshKnown];
-  for(const a of ranked.slice(0,8)) {
-    if(selected.length>=2)break;
-    if(selected.some(x=>sameStory(a,x)))continue;
-    try {
-      const url=await resolveLink(a.url);
-      const host=new URL(url).hostname;
-      if (!host.endsWith(source.domain))continue;
-      const parsed=parseArticle(await fetchText(url),url);
-      const found=known.get(url);
-      const article=found ? {...found} : {...a,id:createHash('sha256').update(url).digest('hex').slice(0,12),title:parsed.title||a.title,originalTitle:parsed.title||a.title,url,publishedAt:parsed.publishedAt||a.publishedAt,topic:topicFor(parsed.title,parsed.body),...createMacroBrief(parsed.title,parsed.paragraphs)};
-      if(selected.some(x=>x.url===url))continue;
-      selected.push({...article,contentHash:parsed.hash,checkedAt:new Date().toISOString()});
-    } catch { /* Try the next public article; do not replace a complete brief with a title. */ }
-  }
-  for (const a of old) if(selected.length<2&&!selected.some(x=>x.id===a.id))selected.push(a);
-  const checked=await Promise.all(selected.slice(0,2).map(async a=>{
-    try {const parsed=parseArticle(await fetchText(a.url),a.url);return {...a,checkedAt:new Date().toISOString(),sourceStatus:'ok',contentHash:parsed.hash,sourceChanged:Boolean(a.contentHash&&a.contentHash!==parsed.hash)};}
-    catch {return {...a,sourceStatus:'cached'};}
-  }));
-  return {articles:checked,discovered:items.length,candidates:ranked.slice(0,5).map(a=>({title:a.title,url:a.url,publishedAt:a.publishedAt,source:source.name}))};
+async function updateSource(source) {
+ const deadline=Date.now()+30000;
+ const items=await feed(source,deadline);
+ const selected=[];
+ const ranked=items.filter(a=>isWithinNewsWindow(a.publishedAt)).sort((a,b)=>score(b)-score(a));
+ for(const candidate of ranked.slice(0,8)) {
+  if(selected.length>=2||Date.now()>=deadline)break;
+  try {
+   const url=await resolveLink(candidate.url,deadline),host=new URL(url).hostname;
+   if(host!==source.domain&&!host.endsWith('.'+source.domain))continue;
+   if(selected.some(a=>a.url===url))continue;
+   const parsed=parseArticle(await fetchText(url,{deadline}),url);
+   // The publisher's ORIGINAL publication time is mandatory. Never substitute
+   // RSS indexing time, modified time, or our own query time for an old story.
+   if(!isWithinNewsWindow(parsed.publishedAt)||!isFinanceNews(parsed.title,parsed.body))continue;
+   const found=known.get(url);
+   const brief=found&&found.contentHash===parsed.hash?{points:found.points,mode:found.mode}:createMacroBrief(parsed.title,parsed.paragraphs);
+   selected.push({...candidate,...brief,id:createHash('sha256').update(url).digest('hex').slice(0,12),url,
+    title:parsed.title||candidate.title,originalTitle:parsed.title||candidate.title,
+    publishedAt:parsed.publishedAt,publicationVerified:true,financeEvidence:parsed.title,
+    topic:topicFor(parsed.title,parsed.body),contentHash:parsed.hash,checkedAt:new Date().toISOString(),sourceStatus:'ok'});
+  }catch { /* An unreadable or unverified story is omitted, never replaced with an older one. */ }
+ }
+ // Previously verified stories may survive a transient fetch failure ONLY while
+ // their actual publication time remains inside the same rolling six hours.
+ for(const a of freshArticles(report.articles).filter(a=>a.sourceKey===source.key).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))){
+  if(selected.length>=2)break;
+  if(!selected.some(x=>x.url===a.url))selected.push(a);
+ }
+ return {articles:freshArticles(selected),discovered:items.length};
 }
-async function refreshReport(hours) {
-  const result=await Promise.allSettled([...sources.map(s=>updateSource(s,hours)),checkMarkets()]);
-  const notes=[];let discovered=0;let candidates=[];
-  const articles=sources.flatMap((s,i)=>{
-    if(result[i].status==='fulfilled'){discovered+=result[i].value.discovered;candidates.push(...result[i].value.candidates);return result[i].value.articles;}
-    notes.push(`${s.name}查詢暫時受限，保留上次完整整理`);return report.articles.filter(a=>a.sourceKey===s.key);
-  });
-  const before=new Set(report.articles.map(x=>x.id));
-  const added=articles.filter(x=>!before.has(x.id)).length;
-  report={...report,reportDate:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()),articles,checkedAt:new Date().toISOString(),discovered,candidates,notes,added};
-  // Atomic persistence: a failed request never erases the last useful report.
-  await fs.writeFile(path.join(root,'latest.json.tmp'),JSON.stringify(report,null,2));
-  await fs.rename(path.join(root,'latest.json.tmp'),path.join(root,'latest.json'));
-  return report;
+async function refreshReport() {
+ const before=new Set(freshArticles(report.articles).map(x=>x.id));
+ const result=await Promise.allSettled([...sources.map(updateSource),checkMarkets()]);
+ const notes=[];let discovered=0;
+ const articles=sources.flatMap((s,i)=>{
+  if(result[i].status==='fulfilled'){discovered+=result[i].value.discovered;return result[i].value.articles;}
+  notes.push(`${s.name}本次查詢受限；僅顯示六小時內已核對的報導。`);
+  return freshArticles(report.articles).filter(a=>a.sourceKey===s.key);
+ });
+ report=enforceNewsWindow({...report,reportDate:dateIn(new Date(),'Asia/Taipei'),articles,checkedAt:new Date().toISOString(),discovered,notes});
+ report.added=report.articles.filter(a=>!before.has(a.id)).length;
+ await fs.writeFile(path.join(root,'latest.json.tmp'),JSON.stringify(report,null,2));
+ await fs.rename(path.join(root,'latest.json.tmp'),path.join(root,'latest.json'));
+ return report;
+}
+function startRefresh(){
+ if(!refreshing){lastRefreshStarted=Date.now();refreshing=refreshReport().finally(()=>{refreshing=null;});}
+ return refreshing;
 }
 function send(res,status,data,type='application/json; charset=utf-8') {
  res.writeHead(status,{'content-type':type,'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'strict-origin-when-cross-origin','x-robots-tag':'noindex, nofollow'});res.end(typeof data==='string'?data:JSON.stringify(data));
@@ -135,15 +144,18 @@ async function handle(req,res) {
  const u=new URL(req.url,'http://localhost');
  if(u.pathname==='/healthz'&&req.method==='GET'){send(res,200,{status:'ok'});return;}
  if(u.pathname==='/robots.txt'&&req.method==='GET'){send(res,200,'User-agent: *\nDisallow: /\n','text/plain; charset=utf-8');return;}
- if(u.pathname==='/api/report'&&req.method==='GET'){await checkMarkets();send(res,200,report);return;}
- if(u.pathname==='/api/refresh'&&req.method==='POST'){
-  const n=Number(u.searchParams.get('hours')||24);const hours=[12,24,72,168].includes(n)?n:24;
-  if(!refreshing&&Date.now()-lastRefreshStarted<60000){send(res,200,{...report,rateLimited:true});return;}
-  if(!refreshing){lastRefreshStarted=Date.now();refreshing=refreshReport(hours).finally(()=>{refreshing=null;});}
-  send(res,200,await refreshing);return;
+ if(u.pathname==='/api/report'&&req.method==='GET'){
+  if(!lastRefreshStarted||Date.now()-lastRefreshStarted>=300000)await startRefresh();
+  else await checkMarkets();
+  report=enforceNewsWindow(report);send(res,200,report);return;
  }
- const file=['/','/market-v2','/market-v3'].includes(u.pathname)?'index.html':u.pathname.slice(1);
- const types={'index.html':'text/html; charset=utf-8','style.css':'text/css; charset=utf-8','app.js':'text/javascript; charset=utf-8','report-text.js':'text/javascript; charset=utf-8'};
+ if(u.pathname==='/api/refresh'&&req.method==='POST'){
+  // The six-hour limit is fixed; query parameters cannot widen it.
+  if(!refreshing&&Date.now()-lastRefreshStarted<60000){report=enforceNewsWindow(report);send(res,200,{...report,rateLimited:true});return;}
+  await startRefresh();report=enforceNewsWindow(report);send(res,200,report);return;
+ }
+ const file=['/','/market-v2','/market-v3','/news-6h'].includes(u.pathname)?'index.html':u.pathname.slice(1);
+ const types={'index.html':'text/html; charset=utf-8','style.css':'text/css; charset=utf-8','app.js':'text/javascript; charset=utf-8','report-text.js':'text/javascript; charset=utf-8','news-policy.js':'text/javascript; charset=utf-8'};
  if(req.method!=='GET'||!types[file]){send(res,404,{error:'找不到頁面'});return;}
  send(res,200,await fs.readFile(path.join(root,file),'utf8'),types[file]);
 }

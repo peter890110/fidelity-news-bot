@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080a0e"><title>AI 財經新聞分析助手</title>
-<link rel="stylesheet" href="/style.css?v=market-3-copy">
+<link rel="stylesheet" href="/style.css?v=news-6h">
 </head>
 <body>
 <svg aria-hidden="true" class="icon-defs"><defs>
@@ -16,22 +16,22 @@
 <main class="shell">
 <header class="masthead"><div><h1><svg><use href="#i-spark"/></svg><span>AI 財經新聞分析助手</span></h1><p>盤前／盤後最新市場脈動與核心財經訊號解碼</p></div><div class="source-status"><i></i><span>公開新聞來源</span></div></header>
 <section class="controls" aria-label="新聞選擇條件">
-<label for="range">時間跨度<select id="range"><option value="12">過去 12 小時</option><option value="24" selected>過去 24 小時（早盤與隔夜新聞）</option><option value="72">過去 3 天</option><option value="168">過去 7 天</option></select></label>
+<label for="range">新聞發布時間<select id="range" disabled><option value="6" selected>最近 6 小時（固定）</option></select></label>
 <label for="focus">選文條件<select id="focus"><option value="all">財經新聞・總體經濟優先</option><option value="通膨與利率">通膨與利率</option><option value="匯率與資金">匯率與資金</option><option value="經濟成長">台灣經濟成長</option><option value="全球景氣">全球景氣</option></select></label>
 <button id="refresh" class="primary"><svg><use href="#i-refresh"/></svg><span>獲取最新財經解析</span></button>
 </section>
-<div class="report-heading"><div><h2>精選今日重大驅動新聞</h2><p id="updated">載入新聞報告…</p></div><button id="copy" class="secondary" disabled><svg><use href="#i-copy"/></svg><span>複製完整分析報告</span></button></div>
-<nav class="section-nav" aria-label="報告區塊"><a href="#taiwan">台股盤後</a><a href="#us">美股盤後</a><a href="#economic">經濟日報 <b>02</b></a><a href="#commercial">工商時報 <b>02</b></a><span>每篇 3 點・每點 200–300 字</span></nav>
+<div class="report-heading"><div><h2>最近六小時財金新聞</h2><p id="updated">載入新聞報告…</p></div><button id="copy" class="secondary" disabled><svg><use href="#i-copy"/></svg><span>複製完整分析報告</span></button></div>
+<nav class="section-nav" aria-label="報告區塊"><a href="#taiwan">台股盤後</a><a href="#us">美股盤後</a><a href="#economic">經濟日報 <b>0</b></a><a href="#commercial">工商時報 <b>0</b></a><span>每篇 3 點・每點 200–300 字</span></nav>
 <p id="notice" class="notice" role="status" hidden></p>
 <section id="taiwan" class="panel blue" aria-label="台股盤後"><div class="section-top"><h2 class="pill">台股盤後</h2><span class="session-date"></span></div><div class="market-content"></div></section>
 <section id="us" class="panel green" aria-label="美股盤後"><div class="section-top"><h2 class="pill">美股盤後</h2><span class="session-date"></span></div><div class="market-content"></div></section>
-<section id="economic" class="panel pink" aria-label="經濟日報"><div class="section-top"><h2 class="pill">經濟日報</h2><span>精選 2 篇</span></div><div class="articles" id="udn"></div></section>
-<section id="commercial" class="panel gold" aria-label="工商時報"><div class="section-top"><h2 class="pill">工商時報</h2><span>精選 2 篇</span></div><div class="articles" id="ctee"></div></section>
+<section id="economic" class="panel pink" aria-label="經濟日報"><div class="section-top"><h2 class="pill">經濟日報</h2><span>正在查詢…</span></div><div class="articles" id="udn"></div></section>
+<section id="commercial" class="panel gold" aria-label="工商時報"><div class="section-top"><h2 class="pill">工商時報</h2><span>正在查詢…</span></div><div class="articles" id="ctee"></div></section>
 <div id="filter-empty" class="filter-empty" hidden>這份報告目前沒有此主題的新聞，請選擇其他選文條件。</div>
 
-<footer><p>盤後採前一個已收盤交易日，依台美各自交易日期更新。</p><p>財經新聞試作版</p></footer>
+<footer><p>新聞僅限發布後六小時內；盤後採前一個已收盤交易日。</p><p>財經新聞試作版</p></footer>
 <dialog id="copy-dialog"><form method="dialog"><h2>複製文字</h2><p>文字已選取，請按 ⌘C 或 Ctrl+C 複製。</p><textarea id="copy-text" readonly aria-label="可複製的報告文字"></textarea><button class="secondary">關閉</button></form></dialog>
 <div id="toast" role="status" hidden></div>
 </main>
-<script type="module" src="/app.js?v=market-3-copy"></script>
+<script type="module" src="/app.js?v=news-6h"></script>
 </body></html>
