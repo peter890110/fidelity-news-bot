@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080a0e"><title>AI 財經新聞分析助手</title>
-<link rel="stylesheet" href="/style.css?v=news-6h">
+<link rel="stylesheet" href="/style.css?v=news-6h-three">
 </head>
 <body>
 <svg aria-hidden="true" class="icon-defs"><defs>
@@ -17,10 +17,10 @@
 <header class="masthead"><div><h1><svg><use href="#i-spark"/></svg><span>AI 財經新聞分析助手</span></h1><p>盤前／盤後最新市場脈動與核心財經訊號解碼</p></div><div class="source-status"><i></i><span>公開新聞來源</span></div></header>
 <section class="controls" aria-label="新聞選擇條件">
 <label for="range">新聞發布時間<select id="range" disabled><option value="6" selected>最近 6 小時（固定）</option></select></label>
-<label for="focus">選文條件<select id="focus"><option value="all">財經新聞・總體經濟優先</option><option value="通膨與利率">通膨與利率</option><option value="匯率與資金">匯率與資金</option><option value="經濟成長">台灣經濟成長</option><option value="全球景氣">全球景氣</option></select></label>
+<label for="focus">選文範圍<select id="focus"><option value="all">總經／產業／財金</option><option value="macro">總體經濟</option><option value="industry">產業動態</option><option value="finance">財金市場</option></select></label>
 <button id="refresh" class="primary"><svg><use href="#i-refresh"/></svg><span>獲取最新財經解析</span></button>
 </section>
-<div class="report-heading"><div><h2>最近六小時財金新聞</h2><p id="updated">載入新聞報告…</p></div><button id="copy" class="secondary" disabled><svg><use href="#i-copy"/></svg><span>複製完整分析報告</span></button></div>
+<div class="report-heading"><div><h2>最近六小時總經・產業・財金新聞</h2><p id="updated">載入新聞報告…</p></div><button id="copy" class="secondary" disabled><svg><use href="#i-copy"/></svg><span>複製完整分析報告</span></button></div>
 <nav class="section-nav" aria-label="報告區塊"><a href="#taiwan">台股盤後</a><a href="#us">美股盤後</a><a href="#economic">經濟日報 <b>0</b></a><a href="#commercial">工商時報 <b>0</b></a><span>每篇 3 點・每點 200–300 字</span></nav>
 <p id="notice" class="notice" role="status" hidden></p>
 <section id="taiwan" class="panel blue" aria-label="台股盤後"><div class="section-top"><h2 class="pill">台股盤後</h2><span class="session-date"></span></div><div class="market-content"></div></section>
@@ -33,5 +33,5 @@
 <dialog id="copy-dialog"><form method="dialog"><h2>複製文字</h2><p>文字已選取，請按 ⌘C 或 Ctrl+C 複製。</p><textarea id="copy-text" readonly aria-label="可複製的報告文字"></textarea><button class="secondary">關閉</button></form></dialog>
 <div id="toast" role="status" hidden></div>
 </main>
-<script type="module" src="/app.js?v=news-6h"></script>
+<script type="module" src="/app.js?v=news-6h-three"></script>
 </body></html>

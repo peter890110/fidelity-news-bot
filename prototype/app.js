@@ -1,4 +1,4 @@
-import {NEWS_WINDOW_MS,freshArticles} from './news-policy.js';
+import {NEWS_WINDOW_MS,ARTICLES_PER_SOURCE,freshArticles} from './news-policy.js';
 import {plainTitle,plainPoint,articleText,marketLines,marketText,reportText} from './report-text.js';
 const $ = id => document.getElementById(id);
 const time = value => new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));
@@ -33,7 +33,7 @@ function renderMarket(id,market){
 }
 function renderArticles(key,articles){
  const container=$(key);container.replaceChildren();
- if(!articles.length){container.append(el('p','news-empty','最近六小時內暫無符合條件的完整財金新聞。'));return;}
+ if(!articles.length){container.append(el('p','news-empty','最近六小時內暫無符合條件的完整總經、產業或財金新聞。'));return;}
  articles.forEach(a=>{
   const article=el('article','article');article.dataset.id=a.id;
   article.append(el('h3','article-title',plainTitle(a.title)));
@@ -42,13 +42,13 @@ function renderArticles(key,articles){
   article.append(points,copyButton(()=>articleText(a),'複製標題與三個重點'));container.append(article);
  });
 }
-function filteredArticles(){return freshArticles(current.articles).filter(a=>$('focus').value==='all'||a.topic===$('focus').value);}
+function filteredArticles(){return freshArticles(current.articles).filter(a=>$('focus').value==='all'||(a.category||'finance')===$('focus').value);}
 function render(){
  const filtered=filteredArticles();
  renderMarket('taiwan',current.markets.taiwan);renderMarket('us',current.markets.us);
  for(const [key,section] of [['udn','economic'],['ctee','commercial']]){
   const items=filtered.filter(a=>a.sourceKey===key);$(section).hidden=false;
-  $(section).querySelector('.section-top>span').textContent=`最近六小時 ${items.length} 篇／最多 2 篇`;
+  $(section).querySelector('.section-top>span').textContent=`最近六小時 ${items.length} 篇／目標 ${ARTICLES_PER_SOURCE} 篇`;
   const nav=document.querySelector(`.section-nav a[href="#${section}"]`);nav.hidden=false;nav.querySelector('b').textContent=items.length;
   renderArticles(key,items);
  }
@@ -57,7 +57,7 @@ function render(){
  const counts={udn:all.filter(a=>a.sourceKey==='udn').length,ctee:all.filter(a=>a.sourceKey==='ctee').length};
  $('updated').textContent=`發布範圍 ${time(start)} — ${time(new Date(now).toISOString())}（台北時間） · 經濟日報 ${counts.udn} 篇／工商時報 ${counts.ctee} 篇`;
  const notices=[...(current.notes||[])];
- if(counts.udn<2||counts.ctee<2)notices.push('僅顯示最近六小時內發布、且已核對的財金新聞；符合條件的篇數不足。');
+ if(counts.udn<ARTICLES_PER_SOURCE||counts.ctee<ARTICLES_PER_SOURCE)notices.push('僅顯示最近六小時內發布、且已核對的總經、產業或財金新聞；符合條件的篇數不足。');
  $('notice').hidden=!notices.length;$('notice').textContent=notices.join(' ');
  clearTimeout(expiryTimer);
  if(all.length){const next=Math.min(...all.map(a=>Date.parse(a.publishedAt)+NEWS_WINDOW_MS+1));expiryTimer=setTimeout(render,Math.max(1,next-Date.now()));}

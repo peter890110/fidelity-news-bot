@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createMacroBrief, topicFor } from './summary.js';
 import { refreshMarkets, dateIn } from './market-data.js';
-import {NEWS_HOURS,isWithinNewsWindow,isFinanceNews,freshArticles,enforceNewsWindow} from './news-policy.js';
+import {NEWS_HOURS,ARTICLES_PER_SOURCE,categoryFor,isWithinNewsWindow,isFinanceNews,freshArticles,enforceNewsWindow} from './news-policy.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
@@ -63,7 +63,7 @@ export function parseArticle(html,url) {
   return { title:meta(html,'og:title').split(' | ')[0], paragraphs, body:paragraphs.join('\n'), publishedAt:date, hash:createHash('sha256').update(paragraphs.join('\n')).digest('hex') };
 }
 async function feed(source,deadline) {
-  const q=`site:${source.domain} (央行 OR 通膨 OR 利率 OR 匯率 OR GDP OR IMF OR 經濟成長) when:6h`;
+  const q=`site:${source.domain} when:6h`;
   const xml=await fetchText(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant`,{deadline});
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m=>({title:xmlTag(m[1],'title').replace(/\s*-\s*工商時報$/,'').replace(/\s*-\s*經濟日報$/,''),url:xmlTag(m[1],'link'),publishedAt:xmlTag(m[1],'pubDate'),sourceKey:source.key,source:source.name})).filter(x=>x.title&&x.url&&isWithinNewsWindow(x.publishedAt)&&isFinanceNews(x.title));
 }
@@ -90,10 +90,12 @@ function score(a) {
 async function updateSource(source) {
  const deadline=Date.now()+30000;
  const items=await feed(source,deadline);
- const selected=[];
+ const selected=freshArticles(report.articles).filter(a=>a.sourceKey===source.key&&known.has(a.url)).slice(0,ARTICLES_PER_SOURCE);
  const ranked=items.filter(a=>isWithinNewsWindow(a.publishedAt)).sort((a,b)=>score(b)-score(a));
- for(const candidate of ranked.slice(0,8)) {
-  if(selected.length>=2||Date.now()>=deadline)break;
+ const first=['macro','industry','finance'].filter(category=>!selected.some(a=>a.category===category)).map(category=>ranked.find(a=>categoryFor(a.title)===category)).filter(Boolean);
+ const ordered=[...first,...ranked.filter(a=>!first.includes(a))];
+ for(const candidate of ordered.slice(0,18)) {
+  if(selected.length>=ARTICLES_PER_SOURCE||Date.now()>=deadline)break;
   try {
    const url=await resolveLink(candidate.url,deadline),host=new URL(url).hostname;
    if(host!==source.domain&&!host.endsWith('.'+source.domain))continue;
@@ -107,13 +109,13 @@ async function updateSource(source) {
    selected.push({...candidate,...brief,id:createHash('sha256').update(url).digest('hex').slice(0,12),url,
     title:parsed.title||candidate.title,originalTitle:parsed.title||candidate.title,
     publishedAt:parsed.publishedAt,publicationVerified:true,financeEvidence:parsed.title,
-    topic:topicFor(parsed.title,parsed.body),contentHash:parsed.hash,checkedAt:new Date().toISOString(),sourceStatus:'ok'});
+    category:found?.category||categoryFor(parsed.title,parsed.body),topic:topicFor(parsed.title,parsed.body),contentHash:parsed.hash,checkedAt:new Date().toISOString(),sourceStatus:'ok'});
   }catch { /* An unreadable or unverified story is omitted, never replaced with an older one. */ }
  }
  // Previously verified stories may survive a transient fetch failure ONLY while
  // their actual publication time remains inside the same rolling six hours.
  for(const a of freshArticles(report.articles).filter(a=>a.sourceKey===source.key).sort((a,b)=>Date.parse(b.publishedAt)-Date.parse(a.publishedAt))){
-  if(selected.length>=2)break;
+  if(selected.length>=ARTICLES_PER_SOURCE)break;
   if(!selected.some(x=>x.url===a.url))selected.push(a);
  }
  return {articles:freshArticles(selected),discovered:items.length};
