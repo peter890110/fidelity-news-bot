@@ -33,7 +33,13 @@ function renderMarket(id,market){
 }
 function renderArticles(key,articles){
  const container=$(key);container.replaceChildren();
- if(!articles.length){container.append(el('p','news-empty','最近六小時內暫無符合條件的完整總經、產業或財金新聞。'));return;}
+ if(!articles.length){
+  const d=current.sourceDiagnostics?.[key];
+  const message=d?.status==='error'||d?.fetchFailed||d?.summaryFailed
+   ?'新聞來源讀取或整理未完成，請重新更新；這不代表六小時內沒有相關新聞。'
+   :$('focus').value!=='all'?'目前分類沒有已完成整理的新聞，可切換「全部」查看。':'尚未取得六小時內已核對的新聞，請按上方按鈕重新查詢。';
+  container.append(el('p','news-empty',message));return;
+ }
  articles.forEach(a=>{
   const article=el('article','article');article.dataset.id=a.id;
   article.append(el('h3','article-title',plainTitle(a.title)));
@@ -57,7 +63,7 @@ function render(){
  const counts={udn:all.filter(a=>a.sourceKey==='udn').length,ctee:all.filter(a=>a.sourceKey==='ctee').length};
  $('updated').textContent=`發布範圍 ${time(start)} — ${time(new Date(now).toISOString())}（台北時間） · 經濟日報 ${counts.udn} 篇／工商時報 ${counts.ctee} 篇`;
  const notices=[...(current.notes||[])];
- if(counts.udn<ARTICLES_PER_SOURCE||counts.ctee<ARTICLES_PER_SOURCE)notices.push('僅顯示最近六小時內發布、且已核對的總經、產業或財金新聞；符合條件的篇數不足。');
+ if((counts.udn<ARTICLES_PER_SOURCE||counts.ctee<ARTICLES_PER_SOURCE)&&!notices.length)notices.push('目前已核對的新聞尚未補足每家三篇；仍僅採用原始發布時間在六小時內的報導。');
  $('notice').hidden=!notices.length;$('notice').textContent=notices.join(' ');
  clearTimeout(expiryTimer);
  if(all.length){const next=Math.min(...all.map(a=>Date.parse(a.publishedAt)+NEWS_WINDOW_MS+1));expiryTimer=setTimeout(render,Math.max(1,next-Date.now()));}

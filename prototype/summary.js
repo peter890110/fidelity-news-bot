@@ -68,9 +68,13 @@ function fit(text,extra) {
 export function createMacroBrief(title,paragraphs) {
  const body=paragraphs.join(' ');if(body.length<250)throw new Error('內文不足以整理');
  const topic=topicFor(title,body),data=metrics(body);
- if(!data.length)throw new Error('沒有可核對的總經數據');
+ // Finance and industry stories need not contain one particular macro metric.
+ // Use distinct, short factual clauses from the verified article in every point.
+ const facts=paragraphs.flatMap(p=>p.match(/[^。！？]+[。！？]?/g)||[]).map(s=>s.trim())
+  .filter(s=>s.length>=28&&s.length<=90&&!/訂閱|延伸閱讀|廣告|推薦閱讀/.test(s));
+ const anchors=[0,1,2].map(i=>facts[Math.floor(i*facts.length/3)]||data[i]||title);
  const headings=['關鍵數據與事件','總經傳導與影響','後續觀察與風險'];
- const points=interpretation[topic].map((t,i)=>({heading:headings[i],text:fit(`${i===0?data.slice(0,2).join('；')+'。':i===1&&data.length>2?data.slice(2,4).join('；')+'。':''}${t}`,'以上屬於依公開資訊所做的觀察，仍須隨後續發布的資料修正。')}));
+ const points=interpretation[topic].map((t,i)=>({heading:headings[i],text:fit(`報導指出，${anchors[i].replace(/[。！？]$/,'')}。${t}`,'以上屬於依公開資訊所做的觀察，仍須隨後續發布的資料修正。')}));
  if(points.some(p=>[...p.text].length<200||[...p.text].length>300))throw new Error('摘要字數未符合要求');
  return {points,topic,mode:'全文數據與規則解讀',preparedAt:new Date().toISOString()};
 }
