@@ -11,6 +11,7 @@ test('six-hour policy rejects expired, future and unverified articles',()=>{
  assert.equal(isWithinNewsWindow(new Date(now+1).toISOString(),now),false);
  assert.equal(eligibleArticle({title:'半導體產業合作',publishedAt:new Date(now).toISOString()},now),false);
  assert.equal(isFinanceNews('台積電工安意外工人身亡','半導體公司事故'),false);
+ assert.equal(isFinanceNews('京華廣場聯貸案獲准展延'),true);
  assert.equal(publisherLinks('<a href="/news/20261021700405-430704">伺服器營收</a>',{key:'ctee',domain:'ctee.com.tw'})[0].url,'https://www.ctee.com.tw/news/20261021700405-430704');
 });
 
