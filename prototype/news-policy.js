@@ -16,7 +16,10 @@ export function isWithinNewsWindow(publishedAt,now=Date.now()) {
  // Missing/ambiguous dates and future dates are never usable as publication evidence.
  return typeof publishedAt==='string'&&/(?:Z|[+-]\d\d:\d\d|GMT|UTC)$/i.test(publishedAt)&&Number.isFinite(stamp)&&stamp<=now&&now-stamp<=NEWS_WINDOW_MS;
 }
-export function isFinanceNews(title,body=''){const text=title+' '+body;return macro.test(text)||finance.test(text)||industry.test(text);}
+export function isFinanceNews(title,body=''){
+ if(/工安|身亡|墜落|車禍|凶殺|命案/.test(title)&&!/營收|財報|停工|停產|產能|供應|損失|成本|影響/.test(title))return false;
+ const text=title+' '+body;return macro.test(text)||finance.test(text)||industry.test(text);
+}
 export function eligibleArticle(article,now=Date.now()) {
  return article.publicationVerified===true&&isWithinNewsWindow(article.publishedAt,now)&&isFinanceNews(article.originalTitle||article.title,article.financeEvidence||'');
 }

@@ -32,6 +32,14 @@ let refreshing = null;
 let lastRefreshStarted = 0;
 const sources = [{ key:'udn', name:'經濟日報', domain:'money.udn.com' }, { key:'ctee', name:'工商時報', domain:'ctee.com.tw' }];
 const known = new Map(seed.articles.map(a => [a.url, a]));
+// Public publisher article entry points. These discover links; they are NEVER
+// publication-time evidence or substitutes for a current article fetch.
+const publisherEntries={ctee:[
+ 'https://www.ctee.com.tw/news/20261021700405-430704',
+ 'https://www.ctee.com.tw/news/20261021700478-430801',
+ 'https://www.ctee.com.tw/news/20261021700560-430201',
+ 'https://www.ctee.com.tw/news/20261021700509-430701'
+]};
 const UA = 'Mozilla/5.0 (compatible; FinancialBriefPrototype/0.2)';
 
 export function clean(s='') {
@@ -46,7 +54,7 @@ async function fetchText(url,options={}) {
   const {deadline,...request}=options;
   const timeout=Math.max(1,Math.min(8000,(deadline||Date.now()+8000)-Date.now()));
   const r = await fetch(url,{...request,signal:AbortSignal.timeout(timeout),headers:{'user-agent':UA,...options.headers}});
-  if (!r.ok) throw new Error(`來源回應 ${r.status}`);
+  if (!r.ok) throw new Error(`${new URL(url).hostname} 來源回應 ${r.status}`);
   return r.text();
 }
 function meta(html,key) {
@@ -72,7 +80,8 @@ export function publisherLinks(html,source) {
  const seen=new Set();const out=[];
  for(const m of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)){
   try{
-   const url=canonical(new URL(m[1],`https://${source.domain}`).href),u=new URL(url);
+   const base=source.key==='ctee'?'https://www.ctee.com.tw':`https://${source.domain}`;
+   const url=canonical(new URL(m[1],base).href),u=new URL(url);
    if(u.hostname!==source.domain&&!u.hostname.endsWith('.'+source.domain))continue;
    if(!(source.key==='udn'?/\/money\/story\/\d+\/\d+$/:/\/news\/\d+-\d+$/).test(u.pathname)||seen.has(url))continue;
    const title=clean(m[2]);if(!title||!isFinanceNews(title))continue;
@@ -82,8 +91,13 @@ export function publisherLinks(html,source) {
  return out;
 }
 async function discover(source,deadline) {
- const pages=source.key==='udn'?['https://money.udn.com/rank/newest/1001/0/1','https://money.udn.com/money/index']:['https://www.ctee.com.tw/livenews'];
- const results=await Promise.allSettled([feed(source,deadline),...pages.map(async u=>publisherLinks(await fetchText(u,{deadline}),source))]);
+ const pages=source.key==='udn'?['https://money.udn.com/rank/newest/1001/0/1','https://money.udn.com/money/index']:
+  [...new Set([...report.articles.filter(a=>a.sourceKey===source.key).map(a=>a.url),...(report.discoveryPaths?.[source.key]||[]),...(publisherEntries[source.key]||[])])].slice(0,8);
+ const results=await Promise.allSettled([feed(source,deadline),...pages.map(async u=>{
+  const html=await fetchText(u,{deadline}),links=publisherLinks(html,source),title=meta(html,'og:title').split(' | ')[0];
+  if(/\/news\/\d+-\d+$/.test(new URL(u).pathname)&&isFinanceNews(title))links.unshift({title,url:u,sourceKey:source.key,source:source.name});
+  return links;
+ })]);
  const items=results.flatMap(r=>r.status==='fulfilled'?r.value:[]);
  if(!items.length&&results.every(r=>r.status==='rejected'))throw new Error('來源清單無法讀取');
  const unique=[...new Map(items.map(a=>[a.url,a])).values()];
@@ -107,6 +121,7 @@ function score(a) {
  const age=a.publishedAt?(Date.now()-Date.parse(a.publishedAt))/3600000:0;
  let n=Math.max(0,NEWS_HOURS-age);
  for(const t of ['央行','通膨','利率','匯率','經濟成長','GDP','IMF','PPI','CPI','貿易','出口'])if(a.title.includes(t))n+=5;
+ for(const t of ['營收','財報','獲利','訂單','資本支出','半導體','伺服器','聯貸'])if(a.title.includes(t))n+=4;
  return n;
 }
 export async function updateSource(source) {
@@ -157,15 +172,16 @@ export async function updateSource(source) {
   if(!selected.some(x=>x.url===a.url))selected.push(a);
  }
  console.info(JSON.stringify({event:'news-source-refresh',source:source.key,...stats,selected:selected.length,errors}));
- return {articles:freshArticles(selected),discovered:items.length,stats,errors};
+ return {articles:freshArticles(selected),discovered:items.length,stats,errors,discoveryPaths:usable.slice(0,6).map(a=>a.url)};
 }
 async function refreshReport() {
  const before=new Set(freshArticles(report.articles).map(x=>x.id));
  const result=await Promise.allSettled([...sources.map(updateSource),checkMarkets()]);
- const notes=[];let discovered=0;const sourceDiagnostics={};
+ const notes=[];let discovered=0;const sourceDiagnostics={};const discoveryPaths={...report.discoveryPaths};
  const articles=sources.flatMap((s,i)=>{
   if(result[i].status==='fulfilled'){
    const value=result[i].value;discovered+=value.discovered;sourceDiagnostics[s.key]={...value.stats,errors:value.errors,status:value.articles.length>=ARTICLES_PER_SOURCE?'ok':(value.stats.fetchFailed||value.stats.summaryFailed?'partial':'insufficient')};
+   if(value.discoveryPaths.length)discoveryPaths[s.key]=value.discoveryPaths;
    if(value.articles.length<ARTICLES_PER_SOURCE&&(value.stats.fetchFailed||value.stats.summaryFailed))notes.push(`${s.name}找到 ${value.discovered} 筆候選，但部分原文讀取或整理失敗，尚未補足三篇；並非沒有相關新聞。`);
    return value.articles;
   }
@@ -173,7 +189,7 @@ async function refreshReport() {
   notes.push(`${s.name}本次查詢受限；僅顯示六小時內已核對的報導。`);
   return freshArticles(report.articles).filter(a=>a.sourceKey===s.key);
  });
- report=enforceNewsWindow({...report,reportDate:dateIn(new Date(),'Asia/Taipei'),articles,checkedAt:new Date().toISOString(),discovered,sourceDiagnostics,notes});
+ report=enforceNewsWindow({...report,reportDate:dateIn(new Date(),'Asia/Taipei'),articles,checkedAt:new Date().toISOString(),discovered,sourceDiagnostics,discoveryPaths,notes});
  report.added=report.articles.filter(a=>!before.has(a.id)).length;
  await fs.writeFile(path.join(root,'latest.json.tmp'),JSON.stringify(report,null,2));
  await fs.rename(path.join(root,'latest.json.tmp'),path.join(root,'latest.json'));
@@ -191,7 +207,8 @@ async function handle(req,res) {
  if(u.pathname==='/healthz'&&req.method==='GET'){send(res,200,{status:'ok'});return;}
  if(u.pathname==='/robots.txt'&&req.method==='GET'){send(res,200,'User-agent: *\nDisallow: /\n','text/plain; charset=utf-8');return;}
  if(u.pathname==='/api/report'&&req.method==='GET'){
-  if(!lastRefreshStarted||Date.now()-lastRefreshStarted>=300000)await startRefresh();
+  if(refreshing)await refreshing;
+  else if(!lastRefreshStarted||Date.now()-lastRefreshStarted>=300000)await startRefresh();
   else await checkMarkets();
   report=enforceNewsWindow(report);send(res,200,report);return;
  }
