@@ -1,3 +1,4 @@
+import {dashboardData} from './dashboard-data.js';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -204,6 +205,7 @@ function send(res,status,data,type='application/json; charset=utf-8') {
 }
 async function handle(req,res) {
  const u=new URL(req.url,'http://localhost');
+ if(u.pathname==='/api/dashboard'&&req.method==='GET'){await checkMarkets();send(res,200,{...await dashboardData(report.markets),markets:report.markets});return;}
  if(u.pathname==='/healthz'&&req.method==='GET'){send(res,200,{status:'ok'});return;}
  if(u.pathname==='/robots.txt'&&req.method==='GET'){send(res,200,'User-agent: *\nDisallow: /\n','text/plain; charset=utf-8');return;}
  if(u.pathname==='/api/report'&&req.method==='GET'){
