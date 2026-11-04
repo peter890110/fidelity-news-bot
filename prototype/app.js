@@ -84,6 +84,8 @@ function renderDashboard(){
  const fg=section('富達基金淨值','日漲跌以本次與前一次公布淨值比較，非即時價格或含息總報酬。','fund-section');
  if(dashboardData){for(const f of dashboardData.funds){const card=dataCard({label:f.name,value:f.status==='ok'?number(f.nav,4):'—',date:f.date,unit:f.currency==='TWD'?'新臺幣':'美元',note:f.shareClass,history:f.history,sourceUrl:f.sourceUrl,error:f.status==='error'});
   const line=el('p',`fund-daily data-change ${f.change<0?'down':f.change>0?'up':''}`,f.status==='ok'?`日漲跌 ${f.change>0?'+':''}${number(f.change,4)}（${signed(f.changePct,'%')}）`:'淨值來源讀取未完成');card.insertBefore(line,card.querySelector('.data-date'));if(f.previousDate)card.append(el('p','data-note',`比較基準 ${f.previousDate}`));if(f.risk)card.append(el('p','fund-risk',f.risk));fg.append(card);}}else fg.append(el('p','chart-empty',dashboardError?'基金淨值來源暫時讀取未完成，請重新更新。':'正在核對五檔基金的級別與最新淨值…'));
+ $('email-export').disabled=!dashboardData;
+ $('email-copy').disabled=!dashboardData;
  root.append(el('p','dashboard-footnote',`市場資料依各卡標示範圍，上市與上櫃不混加。迷你線圖為最多30筆實際日資料，非10年百分位。${dashboardData?'淨值與總經查詢時間 '+time(dashboardData.checkedAt)+'（台北）':''}`));
 }
 async function loadDashboard(){try{const r=await fetch('/api/dashboard',{cache:'no-store',signal:AbortSignal.timeout(40000)});if(!r.ok)throw Error();dashboardData=await r.json();dashboardError=false;}catch{dashboardError=true;}renderDashboard();}
@@ -123,3 +125,46 @@ $('focus').addEventListener('change',()=>{if(current)render()});
 $('copy').addEventListener('click',()=>copyText(reportText(current,filteredArticles()),'完整報告'));
 load();
 loadDashboard();
+
+function makeEmailImage(sections,title){
+ const width=800,rowHeight=138,rows=sections.reduce((n,s)=>n+Math.ceil(s.cards.length/2),0),height=100+sections.length*50+rows*rowHeight+60;
+ const canvas=document.createElement('canvas');canvas.width=width*2;canvas.height=height*2;const ctx=canvas.getContext('2d');ctx.scale(2,2);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,width,height);
+ const write=(str,x,y,size=14,color='#18334e',bold=false)=>{ctx.fillStyle=color;ctx.font=`${bold?'600':'400'} ${size}px "PingFang TC","Microsoft JhengHei",Arial,sans-serif`;ctx.fillText(str,x,y);};
+ write(title,24,38,25,'#102b46',true);write('資料快照 '+time(new Date().toISOString())+'（台北時間）',24,65,12,'#64748b');let y=92;
+ for(const section of sections){write(section.title,24,y+21,18,'#0067a5',true);y+=44;
+  section.cards.forEach((card,i)=>{const x=24+(i%2)*384,top=y+Math.floor(i/2)*rowHeight;ctx.strokeStyle='#dbe3ec';ctx.lineWidth=1;ctx.strokeRect(x,top,368,rowHeight-12);
+   write(card.label,x+12,top+24,13,'#3b5067');write(card.value,x+12,top+57,26,'#102b46',true);
+   if(card.points){const points=card.points.split(' ').map(p=>p.split(',').map(Number));ctx.strokeStyle=points.at(-1)[1]<=points[0][1]?'#c54354':'#168362';ctx.lineWidth=1.5;ctx.beginPath();points.forEach(([px,py],j)=>{const xx=x+240+px/240*110,yy=top+39+py/52*29;j?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);});ctx.stroke();}
+   const change=card.change;write(change,x+12,top+82,13,change.includes('-')?'#168362':change.includes('+')?'#c54354':'#52677b');write(card.date,x+12,top+103,11,'#52677b');
+   if(card.share)write(card.share,x+12,top+119,10,'#52677b');
+  });y+=Math.ceil(section.cards.length/2)*rowHeight;
+ }
+ write('日漲跌以各卡資料日期為準，非即時行情。基金日漲跌非含息總報酬。',24,height-32,11,'#64748b');
+ if(title.includes('基金'))write('全球優質債券基金有相當比重投資於非投資等級之高風險債券。',24,height-15,10,'#64748b');
+ return canvas;
+}
+function showEmailExport(){
+ const sections=emailSections();
+ const target=$('email-images');target.replaceChildren();
+ for(const [title,items,filename]of [['市場與總經數據',sections.slice(0,3),'market-dashboard'],['富達基金淨值',sections.slice(3),'fidelity-funds']]){
+  const canvas=makeEmailImage(items,title),url=canvas.toDataURL('image/png'),block=el('section','email-image');block.append(el('h3','',title));const link=el('a','secondary','下載 PNG 圖片');link.href=url;link.download=`${filename}-${new Date().toISOString().slice(0,10)}.png`;block.append(link);const img=el('img');img.src=url;img.alt=title+'郵件用快照';block.append(img);target.append(block);
+ }
+ $('email-dialog').showModal();
+}
+$('email-export').addEventListener('click',showEmailExport);
+$('email-close').addEventListener('click',()=>$('email-dialog').close());
+
+function emailSections(){return [...document.querySelectorAll('#dashboard-content .data-section')].map(s=>({title:s.querySelector('h3').textContent,cards:[...s.querySelectorAll('.data-card')].map(c=>({label:c.querySelector('h4').textContent,value:c.querySelector('.data-value').textContent,change:c.querySelector('.data-change')?.textContent||c.querySelector('.data-note')?.textContent||'',date:c.querySelector('.data-date').textContent,share:c.querySelector('.fund-daily')?c.querySelector('.data-note')?.textContent:'',points:c.querySelector('.sparkline polyline')?.getAttribute('points')}))}));}
+async function copyEmailDashboard(){
+ const buttons=[$('email-copy'),$('email-copy-dialog')];buttons.forEach(b=>{b.disabled=true;b.textContent='正在複製…';});
+ try{
+  const canvas=makeEmailImage(emailSections(),'市場總經與富達基金快照');
+  if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw Error('clipboard-unavailable');
+  const blob=new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('image-failed')),'image/png'));
+  await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+  toast('已複製全部圖表，請到 Outlook 內文按 ⌘V／Ctrl+V 貼上');
+ }catch{toast('瀏覽器未允許圖片複製。請允許剪貼簿權限後重試，或使用郵件版預覽。');}
+ finally{buttons.forEach(b=>{b.disabled=false;b.textContent='一鍵複製全部圖表';});}
+}
+$('email-copy').addEventListener('click',copyEmailDashboard);
+$('email-copy-dialog').addEventListener('click',copyEmailDashboard);

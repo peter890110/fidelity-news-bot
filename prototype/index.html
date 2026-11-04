@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#080a0e"><title>AI 財經新聞分析助手</title>
-<link rel="stylesheet" href="/style.css?v=macro-funds-v1">
+<link rel="stylesheet" href="/style.css?v=macro-outlook-copy-v3">
 </head>
 <body>
 <svg aria-hidden="true" class="icon-defs"><defs>
@@ -20,7 +20,7 @@
 <label for="focus">選文範圍<select id="focus"><option value="all">總經／產業／財金</option><option value="macro">總體經濟</option><option value="industry">產業動態</option><option value="finance">財金市場</option></select></label>
 <button id="refresh" class="primary"><svg><use href="#i-refresh"/></svg><span>獲取最新財經解析</span></button>
 </section>
-<section id="dashboard" class="dashboard" aria-labelledby="dashboard-title"><div class="dashboard-heading"><div><p class="dashboard-eyebrow">MARKET OVERVIEW</p><h2 id="dashboard-title">總經與市場儀表板</h2><p>台股、美股、匯率利率與富達基金淨值。</p></div><span class="chart-legend">紅色上漲／買超 · 綠色下跌／賣超</span></div><div id="dashboard-content" aria-live="polite"><p class="dashboard-loading">正在載入市場與新聞資料…</p></div></section>
+<section id="dashboard" class="dashboard" aria-labelledby="dashboard-title"><div class="dashboard-heading"><div><p class="dashboard-eyebrow">MARKET OVERVIEW</p><h2 id="dashboard-title">總經與市場儀表板</h2><p>台股、美股、匯率利率與富達基金淨值。</p></div><button id="email-copy" class="secondary" disabled>一鍵複製全部圖表</button><button id="email-export" class="secondary" disabled>預覽郵件版</button><span class="chart-legend">紅色上漲／買超 · 綠色下跌／賣超</span></div><div id="dashboard-content" aria-live="polite"><p class="dashboard-loading">正在載入市場與新聞資料…</p></div></section>
 <div class="report-heading"><div><h2>最近六小時總經・產業・財金新聞</h2><p id="updated">載入新聞報告…</p></div><button id="copy" class="secondary" disabled><svg><use href="#i-copy"/></svg><span>複製完整分析報告</span></button></div>
 <nav class="section-nav" aria-label="報告區塊"><a href="#dashboard">市場儀表板</a><a href="#taiwan">台股盤後</a><a href="#us">美股盤後</a><a href="#economic">經濟日報 <b>0</b></a><a href="#commercial">工商時報 <b>0</b></a><span>每篇 3 點・每點 200–300 字</span></nav>
 <p id="notice" class="notice" role="status" hidden></p>
@@ -31,8 +31,9 @@
 <div id="filter-empty" class="filter-empty" hidden>這份報告目前沒有此主題的新聞，請選擇其他選文條件。</div>
 
 <footer><p>新聞僅限發布後六小時內；盤後採前一個已收盤交易日。</p><p>財經新聞試作版</p></footer>
+<dialog id="email-dialog"><div class="email-dialog-top"><h2>Outlook 郵件圖片</h2><button id="email-close" class="secondary">關閉</button></div><p>按「一鍵複製全部圖表」，再到 Outlook 郵件內文按 ⌘V 或 Ctrl+V，即可一次貼上所有圖表。圖片為當下快照，不會自動更新。</p><button id="email-copy-dialog" class="secondary">一鍵複製全部圖表</button><div id="email-images"></div></dialog>
 <dialog id="copy-dialog"><form method="dialog"><h2>複製文字</h2><p>文字已選取，請按 ⌘C 或 Ctrl+C 複製。</p><textarea id="copy-text" readonly aria-label="可複製的報告文字"></textarea><button class="secondary">關閉</button></form></dialog>
 <div id="toast" role="status" hidden></div>
 </main>
-<script type="module" src="/app.js?v=macro-funds-v1"></script>
+<script type="module" src="/app.js?v=macro-outlook-copy-v3"></script>
 </body></html>
