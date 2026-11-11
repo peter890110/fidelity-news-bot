@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { createMacroBrief, topicFor, SUMMARY_VERSION } from './summary.js';
 import { refreshMarkets, dateIn } from './market-data.js';
-import {NEWS_HOURS,ARTICLES_PER_SOURCE,categoryFor,isWithinNewsWindow,isFinanceNews,freshArticles,enforceNewsWindow} from './news-policy.js';
+import {NEWS_HOURS,ARTICLES_PER_SOURCE,editorialPriority,categoryFor,isWithinNewsWindow,isFinanceNews,freshArticles,enforceNewsWindow} from './news-policy.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4173);
@@ -121,9 +121,7 @@ async function resolveLink(url,deadline) {
 }
 function score(a) {
  const age=a.publishedAt?(Date.now()-Date.parse(a.publishedAt))/3600000:0;
- let n=Math.max(0,NEWS_HOURS-age);
- for(const t of ['央行','通膨','利率','匯率','經濟成長','GDP','IMF','PPI','CPI','貿易','出口'])if(a.title.includes(t))n+=5;
- for(const t of ['營收','財報','獲利','訂單','資本支出','半導體','伺服器','聯貸'])if(a.title.includes(t))n+=4;
+ let n=editorialPriority(a.title,a.financeEvidence||'')+Math.max(0,NEWS_HOURS-age);
  return n;
 }
 export async function updateSource(source) {
@@ -140,7 +138,7 @@ export async function updateSource(source) {
  let cursor=0;
  async function worker(){
   while(cursor<queue.length&&Date.now()<deadline){
-   if(verified.length>=9&&['macro','industry','finance'].every(c=>verified.some(a=>a.category===c)))return;
+   if(verified.length>=18)return;
    const candidate=queue[cursor++];stats.attempted++;let stage='fetch';
    try {
    const url=await resolveLink(candidate.url,deadline),host=new URL(url).hostname;
@@ -165,7 +163,7 @@ export async function updateSource(source) {
  }
  await Promise.all(Array.from({length:6},worker));
  const usable=freshArticles(verified).sort((a,b)=>score(b)-score(a));const selected=[];
- for(const category of ['macro','industry','finance']){const a=usable.find(a=>a.category===category);if(a)selected.push(a);}
+ // Rank by editorial relevance; do not reserve a slot for fund promotion.
  for(const a of usable)if(selected.length<ARTICLES_PER_SOURCE&&!selected.some(b=>b.url===a.url))selected.push(a);
  // Previously verified stories may survive a transient fetch failure ONLY while
  // their actual publication time remains inside the same rolling six hours.

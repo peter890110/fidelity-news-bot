@@ -29,3 +29,18 @@ export function enforceNewsWindow(report,now=Date.now()) {
  return {...report,articles,candidates:[],newsWindowHours:NEWS_HOURS,windowStart:new Date(now-NEWS_WINDOW_MS).toISOString(),windowEnd:new Date(now).toISOString(),
   sourceCounts:{udn:articles.filter(a=>a.sourceKey==='udn').length,ctee:articles.filter(a=>a.sourceKey==='ctee').length}};
 }
+
+// Editorial priority, not a claim about company size or index membership.
+const taiwanCompanies=/台積電|聯發科|鴻海|廣達|緯創|緯穎|台達電|日月光|聯電|聯詠|瑞昱|南亞科|華邦電|群聯|欣興|南電|景碩|台光電|台燿|聯茂|奇鋐|雙鴻|智邦|中華電|中鋼|台塑|南亞|長榮|陽明|萬海|國泰金|富邦金|中信金|玉山金|兆豐金|台新新光金|統一|台泥|和碩|仁寶|華碩|宏碁/;
+const macroFocus=/總經|經濟成長|GDP|央行|聯準會|Fed\b|通膨|CPI|PPI|利率|升息|降息|關稅|貿易|出口|進口|景氣|失業|就業|財政|匯率|匯市|新台幣|台幣|公債|美債|殖利率|油價|原油|PMI/i;
+const businessEvent=/營收|財報|獲利|盈餘|EPS|訂單|資本支出|投資|擴廠|擴產|產能|量產|併購|收購|法說|供應鏈|出貨/i;
+export function editorialPriority(title,body=''){
+ // Title is the primary evidence: incidental macro words in promotional copy
+ // must not lift a product pitch above an actual economic release.
+ if(/婚外情|緋聞|八卦|私生活/.test(title))return -100;
+ if(/高股息|高填息|配息|填息|買進名單|飆股|存股|申購|募集|抽獎/.test(title)&&/ETF|基金|投信|\d{4,6}/.test(title))return -30;
+ if(macroFocus.test(title))return 100;
+ if(taiwanCompanies.test(title)&&businessEvent.test(title+' '+body))return 70;
+ if(/產業|半導體|供應鏈|伺服器|記憶體|航運|金融/.test(title)&&businessEvent.test(title))return 40;
+ return 0;
+}

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createMacroBrief} from './summary.js';
 import {updateSource,publisherLinks} from './server.js';
-import {eligibleArticle,isWithinNewsWindow,isFinanceNews,NEWS_WINDOW_MS} from './news-policy.js';
+import {editorialPriority,eligibleArticle,isWithinNewsWindow,isFinanceNews,NEWS_WINDOW_MS} from './news-policy.js';
 
 test('six-hour policy rejects expired, future and unverified articles',()=>{
  const now=Date.now();
@@ -89,4 +89,11 @@ test('summary consists only of distinct sentences from its own source; no topic 
  }
  assert.ok(a.points.every(p=>!b.points.some(q=>q.text===p.text)));
  assert.throws(()=>createMacroBrief('不足',['只有一句簡短內容，沒有其他新聞資訊可用。']));
+});
+
+
+test('editorial ranking prioritises macro and Taiwan business events over promotion and gossip',()=>{
+ assert.ok(editorialPriority('央行公布利率決策')>editorialPriority('台積電營收創新高'));
+ assert.ok(editorialPriority('台積電營收創新高')>editorialPriority('ETF高股息配息吸金'));
+ assert.ok(editorialPriority('台積電營收創新高')>editorialPriority('黃仁勳婚外情公司涉貿易黑名單'));
 });
