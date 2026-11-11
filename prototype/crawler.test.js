@@ -111,3 +111,12 @@ test('publisher navigation is removed without deleting surrounding article facts
  assert.equal(cleanArticleText('營收年增20%。延伸閱讀：其他公司新聞'), '營收年增20%。');
  assert.equal(cleanArticleText('營收年增20%。\n分享本文\n訂閱電子報'), '營收年增20%。');
 });
+
+
+test('three points balance available source facts to at least 150 characters when feasible',()=>{
+ const source=Array.from({length:9},(_,i)=>`第${i+1}項公司營運資訊：`+'本季合併營收與海外客戶訂單數據依公司公告列示，董事會已確認投資時程，後續出貨維持原定計畫。');
+ const result=createMacroBrief('公司營收與訂單',source);
+ assert.equal(result.points.length,3);
+ for(const point of result.points){assert.ok([...point.text].length>=150);assert.ok([...point.text].length<=300);}
+ assert.equal(result.points.map(p=>p.text).join(''),source.join(''));
+});
