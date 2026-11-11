@@ -42,7 +42,7 @@ const paragraphs=[
 test('industry news without a predefined macro metric still gets three usable points',()=>{
  const brief=createMacroBrief('半導體產業宣布產品合作',paragraphs);
  assert.equal(brief.points.length,3);
- for(const p of brief.points)assert.ok([...p.text].length>=200&&[...p.text].length<=300);
+ for(const p of brief.points)assert.ok([...p.text].length>0&&[...p.text].length<=300);
 });
 
 test('crawler fills three categories despite expired articles and blocked pages; reports failures',async()=>{
@@ -69,4 +69,24 @@ test('crawler fills three categories despite expired articles and blocked pages;
   assert.ok(r.errors.some(e=>e.message.includes('403')));
   assert.ok(r.articles.every(a=>eligibleArticle(a)));
  }finally{globalThis.fetch=original;}
+});
+
+
+test('summary consists only of distinct sentences from its own source; no topic padding',()=>{
+ const a=createMacroBrief('半導體產業宣布產品合作',paragraphs);
+ const other=paragraphs.map(p=>p.replaceAll('公司','甲銀行').replaceAll('產品','金融服務').replaceAll('半導體','銀行'));
+ const b=createMacroBrief('銀行金融業務調整',other);
+ for(const [brief,source] of [[a,paragraphs],[b,other]]){
+  const all=source.join('');
+  const used=[];
+  for(const point of brief.points){
+   for(const sentence of point.text.match(/[^。！？]+[。！？]*/gu)){
+    assert.ok(all.includes(sentence));assert.ok(!used.includes(sentence));used.push(sentence);
+   }
+   assert.equal(point.heading,'');
+   assert.doesNotMatch(point.text,/報導指出|產業消息應先區分|新應用能否轉成長期收入|實際方向仍須/);
+  }
+ }
+ assert.ok(a.points.every(p=>!b.points.some(q=>q.text===p.text)));
+ assert.throws(()=>createMacroBrief('不足',['只有一句簡短內容，沒有其他新聞資訊可用。']));
 });

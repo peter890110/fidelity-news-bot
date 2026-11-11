@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { createMacroBrief, topicFor } from './summary.js';
+import { createMacroBrief, topicFor, SUMMARY_VERSION } from './summary.js';
 import { refreshMarkets, dateIn } from './market-data.js';
 import {NEWS_HOURS,ARTICLES_PER_SOURCE,categoryFor,isWithinNewsWindow,isFinanceNews,freshArticles,enforceNewsWindow} from './news-policy.js';
 
@@ -18,6 +18,7 @@ try { report = JSON.parse(await fs.readFile(path.join(root, 'latest.json'), 'utf
 if(report.layoutVersion!==seed.layoutVersion)report.markets=structuredClone(seed.markets);
 report.layoutVersion=seed.layoutVersion;
 report=enforceNewsWindow(report);
+report.articles=report.articles.filter(a=>a.summaryVersion===SUMMARY_VERSION);
 let marketChecking=null;
 let lastMarketCheck=0;
 let lastMarketDay='';
@@ -152,7 +153,7 @@ export async function updateSource(source) {
    if(!isFinanceNews(parsed.title,parsed.body)){stats.notFinance++;continue;}
    stage='summary';
    const found=known.get(url);
-   const brief=found&&found.contentHash===parsed.hash?{points:found.points,mode:found.mode}:createMacroBrief(parsed.title,parsed.paragraphs);
+   const brief=found&&found.summaryVersion===SUMMARY_VERSION&&found.contentHash===parsed.hash?{points:found.points,mode:found.mode,summaryVersion:SUMMARY_VERSION}:createMacroBrief(parsed.title,parsed.paragraphs);
    if(verified.some(a=>a.url===url))continue;
    verified.push({...candidate,...brief,id:createHash('sha256').update(url).digest('hex').slice(0,12),url,
     title:parsed.title||candidate.title,originalTitle:parsed.title||candidate.title,
