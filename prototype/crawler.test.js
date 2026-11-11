@@ -1,3 +1,5 @@
+import {cleanArticleText} from './article-clean.js';
+import {plainPoint} from './report-text.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createMacroBrief} from './summary.js';
@@ -96,4 +98,16 @@ test('editorial ranking prioritises macro and Taiwan business events over promot
  assert.ok(editorialPriority('央行公布利率決策')>editorialPriority('台積電營收創新高'));
  assert.ok(editorialPriority('台積電營收創新高')>editorialPriority('ETF高股息配息吸金'));
  assert.ok(editorialPriority('台積電營收創新高')>editorialPriority('黃仁勳婚外情公司涉貿易黑名單'));
+});
+
+
+test('publisher navigation is removed without deleting surrounding article facts',()=>{
+ const junk='（閱讀全文： 讚啦! 台積電Q3配息9元 10月營收續寫新高 ）';
+ const input='台積電公布季度財報。'+junk+'公司維持原定資本支出計畫。';
+ const expected='台積電公布季度財報。公司維持原定資本支出計畫。';
+ assert.equal(cleanArticleText(input),expected);
+ assert.equal(plainPoint({text:input}),expected);
+ assert.equal(cleanArticleText('閱讀全文：台積電Q3配息9元'), '');
+ assert.equal(cleanArticleText('營收年增20%。延伸閱讀：其他公司新聞'), '營收年增20%。');
+ assert.equal(cleanArticleText('營收年增20%。\n分享本文\n訂閱電子報'), '營收年增20%。');
 });

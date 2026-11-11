@@ -1,8 +1,9 @@
+import {cleanArticleText} from './article-clean.js';
 import {freshArticles,eligibleArticle} from './news-policy.js';
 const money=value=>Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const net=value=>value==null?'買賣超待公布':`${value<0?'賣超':value>0?'買超':'買賣超'}${money(Math.abs(value))}億元`;
 export const plainTitle=title=>title.replace(/\s*(?:\||｜|-)\s*(?:經濟日報|工商時報).*$/,'').trim();
-export const plainPoint=point=>(typeof point==='string'?point:point.text).replace(/報導指出[，,：:]?\s*/g,'').replace(/(?:總經解讀|總經觀察|延伸觀察|原文數據|另見數據)：/g,'').trim();
+export const plainPoint=point=>cleanArticleText(typeof point==='string'?point:point.text).replace(/報導指出[，,：:]?\s*/g,'').replace(/(?:總經解讀|總經觀察|延伸觀察|原文數據|另見數據)：/g,'').trim();
 export function articleText(article) {
  if(!eligibleArticle(article))return '';
  return [plainTitle(article.title),...article.points.slice(0,3).map((p,i)=>`${i+1}. ${plainPoint(p)}`)].join('\n\n');

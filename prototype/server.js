@@ -1,3 +1,4 @@
+import {cleanArticleText} from './article-clean.js';
 import {dashboardData} from './dashboard-data.js';
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -66,7 +67,7 @@ export function parseArticle(html,url) {
   const isUdn = new URL(url).hostname==='money.udn.com';
   const block = isUdn ? html.match(/<section\b[^>]*id\s*=\s*["']article_body["'][^>]*>([\s\S]*?)<\/section>/i)?.[1]
     : html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1];
-  const paragraphs = [...(block||'').matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(m=>clean(m[1])).filter(s=>s.length>20);
+  const paragraphs = [...(block||'').matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(m=>cleanArticleText(clean(m[1]))).filter(s=>s.length>20);
   if (!paragraphs.length || paragraphs.join('').length<120) throw new Error('未取得足夠的公開新聞內文');
   let date = meta(html,'article:published_time') || html.match(/"datePublished"\s*:\s*"([^"]+)"/)?.[1];
   if (date && !/[Z+]|-\d\d:\d\d$/.test(date.slice(10))) date=date.replace(' ','T')+'+08:00';
@@ -219,7 +220,7 @@ async function handle(req,res) {
   await startRefresh();report=enforceNewsWindow(report);send(res,200,report);return;
  }
  const file=['/','/market-v2','/market-v3','/news-6h'].includes(u.pathname)?'index.html':u.pathname.slice(1);
- const types={'index.html':'text/html; charset=utf-8','style.css':'text/css; charset=utf-8','app.js':'text/javascript; charset=utf-8','report-text.js':'text/javascript; charset=utf-8','news-policy.js':'text/javascript; charset=utf-8'};
+ const types={'index.html':'text/html; charset=utf-8','style.css':'text/css; charset=utf-8','app.js':'text/javascript; charset=utf-8','report-text.js':'text/javascript; charset=utf-8','article-clean.js':'text/javascript; charset=utf-8','news-policy.js':'text/javascript; charset=utf-8'};
  if(req.method!=='GET'||!types[file]){send(res,404,{error:'找不到頁面'});return;}
  send(res,200,await fs.readFile(path.join(root,file),'utf8'),types[file]);
 }

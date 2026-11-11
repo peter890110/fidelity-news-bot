@@ -1,7 +1,8 @@
+import {cleanArticleText} from './article-clean.js';
 // Source-only extractive summarisation. No category prose, invented analysis or
 // padding. Keep complete original sentences so names, numbers and attribution
 // remain auditable against this article rather than a topic-level template.
-export const SUMMARY_VERSION='source-only-v1';
+export const SUMMARY_VERSION='source-only-v2';
 function matchTopic(text) {
  if(/半導體|晶片|台積電|輝達|機器人|伺服器|擴廠|擴產|光通訊/.test(text))return '產業動態';
  if(/匯率|匯市|新台幣|台幣|人民幣|日圓/.test(text))return '匯率與資金';
@@ -14,7 +15,7 @@ export function topicFor(title,body=''){return matchTopic(title+' '+body);}
 const length=s=>[...s].length;
 export function createMacroBrief(title,paragraphs) {
  const seen=new Set();
- let sentences=paragraphs.flatMap(p=>String(p).trim().match(/[^。！？]+[。！？]*/gu)||[])
+ let sentences=paragraphs.flatMap(p=>cleanArticleText(p).match(/[^。！？]+[。！？]*/gu)||[])
   .map(s=>s.trim()).filter(s=>{
    if(length(s)<12||/訂閱|延伸閱讀|廣告|推薦閱讀|看更多|立即加入|版權所有/.test(s)||seen.has(s))return false;
    seen.add(s);return true;
