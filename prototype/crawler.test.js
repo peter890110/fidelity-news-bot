@@ -35,6 +35,11 @@ test('publisher article discovery works when Google is rate limited',async()=>{
 });
 
 const paragraphs=[
+ '海外生產基地本季完成設備保養並恢復正常稼動，公司已向客戶說明交貨時程，原料採購採分批到貨方式辦理，以配合不同產品線的製程需求。',
+ '財務主管表示，公司現金部位足以支應既定設備支出，本年度暫無新增銀行借款安排，存貨週轉天數較上季縮短十天，主要反映先前累積訂單完成交貨。',
+ '公司本季合併營收為新台幣三十億元，較去年同期增加兩成，主要由伺服器客戶新增訂單帶動，海外市場占總營收比重達六成。',
+ '董事會通過新台幣五億元設備投資案，預計分兩季支付款項，新產線將設於既有廠區，相關設備訂購時程已向供應商確認。',
+ '公司現階段員工人數維持兩千人，研發團隊將優先支援既有客戶專案，並持續進行設備調校與新產品可靠度測試，以配合交貨安排。',
  '半導體業者宣布啟動新產品合作計畫，雙方將結合工程團隊進行設計與測試，並依產品驗證結果規劃後續導入。',
  '合作範圍涵蓋產品開發及生產流程改善，目前尚未公布訂單金額。公司表示將持續與合作夥伴討論量產安排，實際進度仍以後續公告為準。',
  '相關產品將用於資料中心與伺服器，公司持續投入研發與工程資源。產業需求與客戶驗證進度將影響新產品出貨，現階段沒有揭露具體銷售目標。',
@@ -44,7 +49,7 @@ const paragraphs=[
 test('industry news without a predefined macro metric still gets three usable points',()=>{
  const brief=createMacroBrief('半導體產業宣布產品合作',paragraphs);
  assert.equal(brief.points.length,3);
- for(const p of brief.points)assert.ok([...p.text].length>0&&[...p.text].length<=300);
+ for(const p of brief.points)assert.ok([...p.text].length>=150&&[...p.text].length<=300);
 });
 
 test('crawler fills three categories despite expired articles and blocked pages; reports failures',async()=>{
@@ -119,4 +124,10 @@ test('three points balance available source facts to at least 150 characters whe
  assert.equal(result.points.length,3);
  for(const point of result.points){assert.ok([...point.text].length>=150);assert.ok([...point.text].length<=300);}
  assert.equal(result.points.map(p=>p.text).join(''),source.join(''));
+});
+
+
+test('three short source points are rejected instead of being published or padded',()=>{
+ const short=['公司本季合併營收年增兩成，海外訂單需求保持穩定。','董事會通過新設備採購案，預計明年完成產線建置。','公司表示產能規劃維持不變，未提供其他營運數據。'];
+ assert.throws(()=>createMacroBrief('公司營收與訂單',short),/150/);
 });

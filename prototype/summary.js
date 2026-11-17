@@ -1,8 +1,10 @@
+import {plainPoint} from './report-text.js';
+import {plainPoint} from './report-text.js';
 import {cleanArticleText} from './article-clean.js';
 // Source-only extractive summarisation. No category prose, invented analysis or
 // padding. Keep complete original sentences so names, numbers and attribution
 // remain auditable against this article rather than a topic-level template.
-export const SUMMARY_VERSION='source-only-v3';
+export const SUMMARY_VERSION='source-only-v4-min150';
 function matchTopic(text) {
  if(/半導體|晶片|台積電|輝達|機器人|伺服器|擴廠|擴產|光通訊/.test(text))return '產業動態';
  if(/匯率|匯市|新台幣|台幣|人民幣|日圓/.test(text))return '匯率與資金';
@@ -12,11 +14,11 @@ function matchTopic(text) {
  return '貨幣與貿易';
 }
 export function topicFor(title,body=''){return matchTopic(title+' '+body);}
-const length=s=>[...s].length;
+const length=s=>[...s.replace(/\s/gu,'')].length;
 export function createMacroBrief(title,paragraphs) {
  const seen=new Set();
  let sentences=paragraphs.flatMap(p=>cleanArticleText(p).match(/[^。！？]+[。！？]*/gu)||[])
-  .map(s=>s.trim()).filter(s=>{
+  .map(s=>plainPoint(s)).filter(s=>{
    if(length(s)<12||/訂閱|延伸閱讀|廣告|推薦閱讀|看更多|立即加入|版權所有/.test(s)||seen.has(s))return false;
    seen.add(s);return true;
   });
@@ -37,11 +39,11 @@ export function createMacroBrief(title,paragraphs) {
  let best=null;
  for(let a=1;a<sentences.length-1;a++)for(let b=a+1;b<sentences.length;b++){
   const sizes=[sums[a],sums[b]-sums[a],sums.at(-1)-sums[b]];
-  if(sizes.some(n=>n>300))continue;
+  if(sizes.some(n=>n<150||n>300))continue;
   const value=sizes.reduce((n,size)=>n+cost(size),0);
   if(!best||value<best.value)best={a,b,value};
  }
- if(!best)throw new Error('原文句子無法在三點各300字內完整呈現');
+ if(!best)throw new Error('原文有效資訊無法整理為三點各150至300字，改選其他新聞');
  const points=[sentences.slice(0,best.a),sentences.slice(best.a,best.b),sentences.slice(best.b)]
   .map(group=>({heading:'',text:group.join('')}));
  return {points,topic:topicFor(title,paragraphs.join(' ')),mode:'原文重點摘錄',summaryVersion:SUMMARY_VERSION,preparedAt:new Date().toISOString()};
