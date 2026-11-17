@@ -1,5 +1,4 @@
 import {plainPoint} from './report-text.js';
-import {plainPoint} from './report-text.js';
 import {cleanArticleText} from './article-clean.js';
 // Source-only extractive summarisation. No category prose, invented analysis or
 // padding. Keep complete original sentences so names, numbers and attribution
