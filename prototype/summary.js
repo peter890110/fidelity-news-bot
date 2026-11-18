@@ -3,7 +3,7 @@ import {cleanArticleText} from './article-clean.js';
 // Source-only extractive summarisation. No category prose, invented analysis or
 // padding. Keep complete original sentences so names, numbers and attribution
 // remain auditable against this article rather than a topic-level template.
-export const SUMMARY_VERSION='source-only-v4-min150';
+export const SUMMARY_VERSION='source-only-v5-independent';
 function matchTopic(text) {
  if(/半導體|晶片|台積電|輝達|機器人|伺服器|擴廠|擴產|光通訊/.test(text))return '產業動態';
  if(/匯率|匯市|新台幣|台幣|人民幣|日圓/.test(text))return '匯率與資金';
@@ -15,35 +15,44 @@ function matchTopic(text) {
 export function topicFor(title,body=''){return matchTopic(title+' '+body);}
 const length=s=>[...s.replace(/\s/gu,'')].length;
 export function createMacroBrief(title,paragraphs) {
- const seen=new Set();
- let sentences=paragraphs.flatMap(p=>cleanArticleText(p).match(/[^。！？]+[。！？]*/gu)||[])
-  .map(s=>plainPoint(s)).filter(s=>{
-   if(length(s)<12||/訂閱|延伸閱讀|廣告|推薦閱讀|看更多|立即加入|版權所有/.test(s)||seen.has(s))return false;
-   seen.add(s);return true;
-  });
- // For long articles, prefer title-related facts and numerical disclosures
- // across the full body, then restore source order for coherent attribution.
- if(sentences.reduce((n,s)=>n+length(s),0)>650){
-  const terms=[...new Set((title.match(/[\p{Script=Han}]{2,}|[A-Za-z]{2,}/gu)||[]).flatMap(t=>t.length>4?[...t].slice(0,-1).map((_,i)=>t.slice(i,i+2)):[t]))];
-  const ranked=sentences.map((s,index)=>({s,index,score:(index===0?12:0)+terms.filter(t=>s.includes(t)).length*2+(/\d/.test(s)?3:0)+(/表示|指出|預估|預計|宣布|營收|獲利|成長|年增|年減|訂單|利率|通膨/.test(s)?2:0)})).filter(x=>length(x.s)<=300).sort((a,b)=>b.score-a.score||a.index-b.index);
-  const chosen=[];let size=0;
-  for(const row of ranked)if(size+length(row.s)<=650){chosen.push(row);size+=length(row.s);}
-  sentences=chosen.sort((a,b)=>a.index-b.index).map(x=>x.s);
+ // Paragraph boundaries carry discourse context. Never flatten the article
+ // into sentences and cut it into three equal-sized pieces.
+ const blocks=paragraphs.map(p=>plainPoint(cleanArticleText(p))).filter(Boolean);
+ const dependent=/^(?:[「「“]?)(?:此外|不過|但是|然而|因此|所以|其中|這(?:項|個|些|次|也|將|是)|此(?:外|項|案|次|舉)|他(?:表示|指出|說|認為)|她(?:表示|指出|說|認為)|該(?:公司|行|案|項)|也|而(?:且|這|他|其)|同時|另外|至於|對此|上述|前述)/u;
+ const terms=[...new Set(title.match(/[A-Za-z]{2,}|[\p{Script=Han}]{2}/gu)||[])];
+ const candidates=[];
+ for(let start=0;start<blocks.length;start++){
+  if(dependent.test(blocks[start]))continue;
+  let text='';
+  for(let end=start;end<Math.min(blocks.length,start+8);end++){
+   text+=blocks[end];
+   if(length(text)>300)break;
+   if(length(text)<150||/[，、；：,;:]$/.test(text))continue;
+   candidates.push({start,end,text,score:terms.filter(t=>text.includes(t)).length*3+(start===0?8:0)+(end===start?5:0)-Math.abs(length(text)-190)/30});
+  }
  }
- if(sentences.length<3)throw new Error('原文有效資訊不足三點，不產生填充摘要');
- // Choose three consecutive groups together, rather than greedily consuming
- // text in points one and two and leaving a short final point. Never pad.
- const sums=[0];for(const sentence of sentences)sums.push(sums.at(-1)+length(sentence));
- const cost=n=>Math.max(0,150-n)**2*100+(n-180)**2;
+ // Bound combination search on unusually long publisher pages.
+ candidates.sort((a,b)=>b.score-a.score).splice(60);
+ candidates.sort((a,b)=>a.start-b.start||a.end-b.end);
+ const sameFact=(a,b)=>{
+  if(a.end>=b.start)return true;
+  const aa=new Set(a.text.match(/[^。！？]+[。！？]*/gu)||[]);
+  return (b.text.match(/[^。！？]+[。！？]*/gu)||[]).some(s=>aa.has(s));
+ };
+ // Pick independent, non-overlapping paragraph groups. A third point is
+ // optional; do not divide an otherwise complete second point to manufacture it.
  let best=null;
- for(let a=1;a<sentences.length-1;a++)for(let b=a+1;b<sentences.length;b++){
-  const sizes=[sums[a],sums[b]-sums[a],sums.at(-1)-sums[b]];
-  if(sizes.some(n=>n<150||n>300))continue;
-  const value=sizes.reduce((n,size)=>n+cost(size),0);
-  if(!best||value<best.value)best={a,b,value};
+ for(let a=0;a<candidates.length;a++)for(let b=a+1;b<candidates.length;b++){
+  const x=candidates[a],y=candidates[b];if(sameFact(x,y))continue;
+  const pair=[x,y];const pairScore=x.score+y.score;
+  if(!best||best.items.length<2||best.items.length===2&&pairScore>best.score)best={items:pair,score:pairScore};
+  for(let c=b+1;c<candidates.length;c++){
+   const z=candidates[c];if(sameFact(x,z)||sameFact(y,z))continue;
+   const score=pairScore+z.score;
+   if(best.items.length<3||score>best.score)best={items:[x,y,z],score};
+  }
  }
- if(!best)throw new Error('原文有效資訊無法整理為三點各150至300字，改選其他新聞');
- const points=[sentences.slice(0,best.a),sentences.slice(best.a,best.b),sentences.slice(best.b)]
-  .map(group=>({heading:'',text:group.join('')}));
+ if(!best)throw new Error('原文不足兩個獨立且各至少150字的重點，改選其他新聞');
+ const points=best.items.map(item=>({heading:'',text:item.text}));
  return {points,topic:topicFor(title,paragraphs.join(' ')),mode:'原文重點摘錄',summaryVersion:SUMMARY_VERSION,preparedAt:new Date().toISOString()};
 }

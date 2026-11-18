@@ -47,7 +47,7 @@ function renderArticles(key,articles){
   article.append(el('h3','article-title',plainTitle(a.title)));
   const points=el('ol','points');
   a.points.slice(0,3).forEach(p=>{const li=el('li','point');li.append(el('p','',plainPoint(p)));points.append(li)});
-  article.append(points,copyButton(()=>articleText(a),'複製標題與三個重點'));container.append(article);
+  article.append(points,copyButton(()=>articleText(a),`複製標題與${a.points.length}個重點`));container.append(article);
  });
 }
 function filteredArticles(){return freshArticles(current.articles).filter(a=>$('focus').value==='all'||(a.category||'finance')===$('focus').value);}

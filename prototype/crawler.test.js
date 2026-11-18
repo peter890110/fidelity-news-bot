@@ -123,11 +123,27 @@ test('three points balance available source facts to at least 150 characters whe
  const result=createMacroBrief('公司營收與訂單',source);
  assert.equal(result.points.length,3);
  for(const point of result.points){assert.ok([...point.text].length>=150);assert.ok([...point.text].length<=300);}
- assert.equal(result.points.map(p=>p.text).join(''),source.join(''));
+ for(const p of result.points)assert.ok(source.join('').includes(p.text));
 });
 
 
 test('three short source points are rejected instead of being published or padded',()=>{
  const short=['公司本季合併營收年增兩成，海外訂單需求保持穩定。','董事會通過新設備採購案，預計明年完成產線建置。','公司表示產能規劃維持不變，未提供其他營運數據。'];
  assert.throws(()=>createMacroBrief('公司營收與訂單',short),/150/);
+});
+
+
+test('keeps complete source paragraphs and permits two independent points',()=>{
+ const facts=[
+  '甲公司公布第三季財報，營收成長主要來自海外客戶新增訂單，毛利率改善反映高階產品比重提升。'+ '財務主管說明本季設備折舊增加，費用控管仍按年度預算執行，既有業務收款時程維持穩定，公司未調整全年營運目標。'+ '海外出貨占整體營收六成，主要市場為北美與歐洲，新增訂單由既有工廠承接，管理層表示目前供應能力足以配合客戶需求，短期沒有委外生產安排。',
+  '乙銀行董事會通過金融科技投資計畫，將分階段導入新的風險管理系統，預計明年完成首批分行測試。'+ '投資款項由自有資金支應，年度支出已納入董事會核定預算，專案團隊將依測試結果安排後續上線作業，現階段未對外提供效益預測。'+ '資訊部門負責執行設備採購與系統整合，內部稽核單位將按月檢查專案進度，正式上線前須完成資料驗證及員工教育訓練，銀行尚未公布其他新增計畫。'
+ ];
+ const brief=createMacroBrief('企業財報與銀行投資',facts);
+ assert.equal(brief.points.length,2);
+ assert.deepEqual(brief.points.map(p=>p.text),facts);
+ for(const p of brief.points)assert.ok([...p.text].length>=150);
+ const continuation='其中，相關訂單預計明年交貨。'.repeat(12);
+ const withContinuation=createMacroBrief('企業財報與銀行投資',[...facts,continuation]);
+ assert.equal(withContinuation.points.length,2);
+ assert.ok(withContinuation.points.every(p=>!p.text.startsWith('其中')));
 });
