@@ -18,7 +18,7 @@ export function createMacroBrief(title,paragraphs) {
  // Paragraph boundaries carry discourse context. Never flatten the article
  // into sentences and cut it into three equal-sized pieces.
  const blocks=paragraphs.map(p=>plainPoint(cleanArticleText(p))).filter(Boolean);
- const dependent=/^(?:[「「“]?)(?:此外|不過|但是|然而|因此|所以|其中|這(?:項|個|些|次|也|將|是)|此(?:外|項|案|次|舉)|他(?:表示|指出|說|認為)|她(?:表示|指出|說|認為)|該(?:公司|行|案|項)|也|而(?:且|這|他|其)|同時|另外|至於|對此|上述|前述)/u;
+ const dependent=/^(?:[「「“]?)(?:此外|不過|但是|然而|因此|所以|其中|這(?:項|個|些|次|也|將|是)|此(?:外|項|案|次|舉)|他|她|它|該(?:公司|行|案|項)|也|而(?:且|這|他|其)|同時|另外|至於|對此|上述|前述)/u;
  const terms=[...new Set(title.match(/[A-Za-z]{2,}|[\p{Script=Han}]{2}/gu)||[])];
  const candidates=[];
  for(let start=0;start<blocks.length;start++){
