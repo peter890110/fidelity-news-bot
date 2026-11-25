@@ -15,12 +15,13 @@ export function marketLines(id,market) {
  ];
  const values=new Map((market.flow||[]).map(x=>[x.name,x.value]));
  return [
-  `成交量${money(market.turnoverBillions)}億元；三大法人合計${net(market.netFlowBillions)}。`,
+  `上市全日成交金額${money(market.turnoverBillions)}億元；三大法人合計${net(market.netFlowBillions)}。`,
   '觀察三大法人今天籌碼動向，'+['外資','自營商','投信'].map(name=>`${name}${net(values.get(name))}`).join('；')+'。',
   '台股最新交易日走勢，'+market.summary
  ];
 }
 export function marketText(id,market) {
+ if(market.status==='unverified')return `${market.label}｜資料尚未核對完成，暫不提供留存數字供複製`;
  const warning=market.status==='unverified'?`\n${market.verificationError}`:'';
  return `${market.label}｜${market.sessionDate} 收盤${warning}\n\n`+marketLines(id,market).map(t=>'• '+t).join('\n\n');
 }
@@ -30,4 +31,11 @@ export function reportText(report,articles=report.articles) {
    const selected=freshArticles(articles).filter(a=>a.source===source);
    return selected.length?[source,...selected.map(articleText)]:[];
   })].join('\n\n');
+}
+
+// Report and dashboard requests finish independently; use the latest actual
+// market check consistently for both the visible cards and copied report.
+export function latestMarkets(...sets){
+ const usable=sets.filter(Boolean);if(!usable.length)return null;
+ return Object.fromEntries(['taiwan','us'].map(key=>[key,usable.map(s=>s[key]).filter(Boolean).sort((a,b)=>(Date.parse(b.checkedAt)||0)-(Date.parse(a.checkedAt)||0))[0]]));
 }

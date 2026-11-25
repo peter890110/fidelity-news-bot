@@ -147,3 +147,8 @@ test('keeps complete source paragraphs and permits two independent points',()=>{
  assert.equal(withContinuation.points.length,2);
  assert.ok(withContinuation.points.every(p=>!p.text.startsWith('其中')));
 });
+
+
+test('publisher disclaimer is not counted as news facts or used to pad a point',()=>{
+ assert.equal(cleanArticleText('台股收盤上漲。※免責聲明：內容僅供參考，並非投資建議。'),'台股收盤上漲。');
+});

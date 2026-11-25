@@ -3,7 +3,7 @@ import {cleanArticleText} from './article-clean.js';
 // Source-only extractive summarisation. No category prose, invented analysis or
 // padding. Keep complete original sentences so names, numbers and attribution
 // remain auditable against this article rather than a topic-level template.
-export const SUMMARY_VERSION='source-only-v5-independent';
+export const SUMMARY_VERSION='source-only-v6-clean';
 function matchTopic(text) {
  if(/半導體|晶片|台積電|輝達|機器人|伺服器|擴廠|擴產|光通訊/.test(text))return '產業動態';
  if(/匯率|匯市|新台幣|台幣|人民幣|日圓/.test(text))return '匯率與資金';

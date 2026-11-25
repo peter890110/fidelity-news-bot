@@ -1,4 +1,4 @@
-const number = value => Number(String(value).replaceAll(',',''));
+const number = value => value==null||String(value).trim()===''?NaN:Number(String(value).replaceAll(',',''));
 const format = value => Number(value).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const direction = value => value>0?'上漲':value<0?'下跌':'持平';
 export const dateIn = (now,zone) => new Intl.DateTimeFormat('sv-SE',{timeZone:zone}).format(now);
@@ -20,6 +20,7 @@ export function parseInstitutional(data,sessionDate) {
  if(!dealerRows.length)dealerRows=row(n=>n.startsWith('自營商('));
  const totalRows=row(n=>n==='合計'||n==='合併');
  if(!foreignRows.length||!trustRows.length||!dealerRows.length||!totalRows.length)return null;
+ if(data.data.some(r=>![r[1],r[2],r[3]].map(number).every(Number.isFinite)||Math.abs(number(r[1])-number(r[2])-number(r[3]))>1))return null;
  const foreign=amount(foreignRows),dealer=amount(dealerRows),trust=amount(trustRows),total=amount(totalRows);
  if(![foreign,dealer,trust,total].every(Number.isFinite)||Math.abs(foreign+dealer+trust-total)>1)return null;
  return {flowPublished:true,flowDate:sessionDate,netFlowBillions:total/1e8,flow:[{name:'外資',value:foreign/1e8},{name:'自營商',value:dealer/1e8},{name:'投信',value:trust/1e8}]};
@@ -43,10 +44,18 @@ export function parseTaiwanSessions(data) {
 export function previousTaiwanSession(sessions,now=new Date()) {
  return sessions.filter(x=>x.sessionDate<dateIn(now,'Asia/Taipei')).sort((a,b)=>b.sessionDate.localeCompare(a.sessionDate))[0];
 }
-function taiwanSummary(session,sectors) {
- const sorted=sectors.sort((a,b)=>b.changePct-a.changePct),strongest=sorted[0],weakest=sorted.at(-1);
- const breadth=strongest&&weakest?`${strongest.name}${direction(strongest.changePct)}${format(Math.abs(strongest.changePct))}%，${weakest.name}${direction(weakest.changePct)}${format(Math.abs(weakest.changePct))}%，類股表現存在差異。`:'';
- return `${shortDate(session.sessionDate)}加權指數收在${format(session.close)}點，${direction(session.change)}${format(Math.abs(session.change))}點，漲跌幅${session.changePct>=0?'+':''}${session.changePct.toFixed(2)}%，全日成交金額${format(session.turnoverBillions)}億元。${breadth}觀察這次收盤，除指數漲跌外，也應配合成交規模與法人買賣方向，判斷市場參與情形。類股指數的漲跌反映當日價格變化，個別公司的表現仍可能不同。後續可持續追蹤權值股、資金流向及國際市場變化，確認當日走勢能否延續。`;
+export function taiwanSummary(session,sectors) {
+ const sorted=[...sectors].sort((a,b)=>b.changePct-a.changePct),strongest=sorted[0],weakest=sorted.at(-1);
+ const breadth=strongest&&weakest?`，類股中${strongest.name}${direction(strongest.changePct)}${format(Math.abs(strongest.changePct))}%，${weakest.name}${direction(weakest.changePct)}${format(Math.abs(weakest.changePct))}%`:'';
+ return `${shortDate(session.sessionDate)}加權指數收在${format(session.close)}點，${direction(session.change)}${format(Math.abs(session.change))}點，漲跌幅${session.changePct>=0?'+':''}${session.changePct.toFixed(2)}%，上市全日成交金額${format(session.turnoverBillions)}億元${breadth}。`;
+}
+export function validateTaiwanDaily(session,daily){
+ if(daily.stat!=='OK'||daily.date!==compact(session.sessionDate))throw Error('台股收盤日期不一致');
+ const table=daily.tables?.find(t=>/價格指數\(臺灣證券交易所\)/.test(t.title));
+ const row=table?.data?.find(r=>r[0]==='發行量加權股價指數');
+ const sign=String(row?.[2]).includes('-')?-1:1;
+ if(!row||!Number.isFinite(number(row[1]))||Math.abs(number(row[1])-session.close)>0.011||Math.abs(sign*number(row[3])-session.change)>0.011||Math.abs(number(row[4])-session.changePct)>0.011)throw Error('台股月報與每日收盤指數不一致，暫不發布');
+ return table;
 }
 export async function fetchTaiwanMarket(previous,now=new Date()) {
  const today=dateIn(now,'Asia/Taipei');
@@ -59,12 +68,11 @@ export async function fetchTaiwanMarket(previous,now=new Date()) {
  if(!session)throw new Error('無法核對台股前一交易日');
  const url=`https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=${compact(session.sessionDate)}&type=ALL`;
  const daily=await json(url);
- if(daily.stat!=='OK'||daily.date!==compact(session.sessionDate))throw new Error('台股收盤日期不一致');
- const priceTable=daily.tables?.find(t=>/價格指數\(臺灣證券交易所\)/.test(t.title));
+ const priceTable=validateTaiwanDaily(session,daily);
  const sectors=(priceTable?.data||[]).filter(r=>/類指數$/.test(r[0])&&Number.isFinite(number(r[4]))).map(r=>({name:r[0],changePct:number(r[4])}));
  const same=previous?.sessionDate===session.sessionDate;
  const market={label:'台股盤後',...session,flowPublished:same&&previous.flowPublished||false,netFlowBillions:same?previous.netFlowBillions:null,flow:same?previous.flow:[],flowDate:session.sessionDate,
-  summary:previous?.sessionDate===session.sessionDate?previous.summary:taiwanSummary(session,sectors),url,sourceLabel:'臺灣證券交易所',sources:[{label:'證交所收盤統計',url},{label:'證交所三大法人統計',url:`https://www.twse.com.tw/fund/BFI82U?response=json&dayDate=${compact(session.sessionDate)}&type=day`}],
+  turnoverScope:'上市全日成交金額（含ETF、權證等上市證券，非僅一般股票或盤中速報）',summary:taiwanSummary(session,sectors),url,sourceLabel:'臺灣證券交易所',sources:[{label:'證交所收盤統計',url},{label:'證交所三大法人統計',url:`https://www.twse.com.tw/fund/BFI82U?response=json&dayDate=${compact(session.sessionDate)}&type=day`}],
   verifiedFor:today,status:'verified',checkedAt:now.toISOString()};
  try {return await fetchInstitutional(market);}catch {return market;}
 }
@@ -89,28 +97,26 @@ async function fetchUSSeries(symbol) {
  }
  throw error;
 }
-function usSummary(date,indices) {
- const [dow,nasdaq,sp,sox]=indices,positive=indices.filter(x=>x.changePct>0).length;
- const movement=positive===4?'四大指數同步收高':positive===0&&indices.every(x=>x.changePct<0)?'四大指數同步收低':'四大指數漲跌互見';
- const tech=nasdaq.changePct<dow.changePct?'科技股指數表現弱於道瓊，科技類股承受的價格壓力相對較大。':'科技股指數表現優於道瓊，科技類股的相對表現較強。';
- return `美東${shortDate(date)}${movement}。道瓊收在${format(dow.close)}點，納斯達克收在${format(nasdaq.close)}點，標普500收在${format(sp.close)}點，費城半導體收在${format(sox.close)}點。${tech}觀察這次收盤，應同時比較大型股、科技股與半導體的強弱，並配合成交及後續財報確認走勢。單日指數變動仍不足以判定中期趨勢，後續可留意類股表現是否擴散，以及主要經濟數據公布後的市場反應。`;
+export function usSummary(date,indices) {
+ const positive=indices.filter(x=>x.changePct>0).length;
+ const movement=positive===4?'四大指數同步收高':indices.every(x=>x.changePct<0)?'四大指數同步收低':'四大指數漲跌互見';
+ return `美東${shortDate(date)}${movement}，`+indices.map(i=>`${i.name}收在${format(i.close)}點，${direction(i.changePct)}${Math.abs(i.changePct).toFixed(2)}%`).join('；')+'。';
 }
 export async function fetchUSMarket(previous,now=new Date()) {
  const histories=await Promise.all(instruments.map(([,symbol])=>fetchUSSeries(symbol)));
  const latest=histories.map(h=>previousUSSession(h,now));
  if(latest.some(x=>!x)||!latest.every(x=>x.sessionDate===latest[0].sessionDate))throw new Error('美股四大指數交易日期不一致');
  const sessionDate=latest[0].sessionDate;
- let indices=histories.map((h,i)=>{
+ const priorDates=histories.map(h=>h.filter(x=>x.sessionDate<sessionDate).at(-1)?.sessionDate);
+ if(!priorDates[0]||!priorDates.every(d=>d===priorDates[0]))throw Error('美股四大指數比較基準日不一致');
+ const indices=histories.map((h,i)=>{
   const current=latest[i],prev=h.filter(x=>x.sessionDate<sessionDate).at(-1);
   if(!prev||prev.close<=0)throw new Error('美股前次收盤價不足');
   return {name:instruments[i][0],symbol:instruments[i][1],close:current.close,changePct:(current.close/prev.close-1)*100};
  });
- // Retain the cross-checked published close for that exact session; future sessions use fetched history.
- const researchedClose=previous?.researchedClose;
- if(researchedClose?.sessionDate===sessionDate)indices=researchedClose.indices;
- return {label:'美股盤後',sessionDate,indices,researchedClose,summary:previous?.sessionDate===sessionDate?previous.summary:usSummary(sessionDate,indices),
-  verifiedFor:dateIn(now,'Asia/Taipei'),status:'verified',checkedAt:now.toISOString(),
-  sources:[...(researchedClose?.sessionDate===sessionDate?researchedClose.sources:[]),...instruments.map(([label,symbol])=>({label,url:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/history/`}))]};
+ return {label:'美股盤後',sessionDate,indices,summary:usSummary(sessionDate,indices),
+  comparisonDate:priorDates[0],verifiedFor:dateIn(now,'Asia/Taipei'),status:'verified',checkedAt:now.toISOString(),
+  sources:instruments.map(([label,symbol])=>({label,url:`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}/history/`}))};
 }
 export async function refreshMarkets(markets,now=new Date()) {
  const keys=['taiwan','us'];

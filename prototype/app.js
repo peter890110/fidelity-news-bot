@@ -1,5 +1,5 @@
 import {NEWS_WINDOW_MS,ARTICLES_PER_SOURCE,freshArticles} from './news-policy.js';
-import {plainTitle,plainPoint,articleText,marketLines,marketText,reportText} from './report-text.js';
+import {latestMarkets,plainTitle,plainPoint,articleText,marketLines,marketText,reportText} from './report-text.js';
 const $ = id => document.getElementById(id);
 const time = value => new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));
 let current;
@@ -31,7 +31,8 @@ function renderMarket(id,market){
  if(market.status==='unverified')area.append(el('p','market-warning',market.verificationError));
  const list=el('ul','market-list'),lines=marketLines(id,market);
  lines.forEach((text,i)=>{const li=el('li',i===lines.length-1?'market-recap':'',text);if(text.includes('待公布'))li.classList.add('market-pending');list.append(li)});
- area.append(list,copyButton(()=>marketText(id,market),`複製${market.label}`));
+ const copy=copyButton(()=>marketText(id,market),`複製${market.label}`);copy.disabled=market.status!=='verified';
+ area.append(list,copy);
 }
 function renderArticles(key,articles){
  const container=$(key);container.replaceChildren();
@@ -45,6 +46,7 @@ function renderArticles(key,articles){
  articles.forEach(a=>{
   const article=el('article','article');article.dataset.id=a.id;
   article.append(el('h3','article-title',plainTitle(a.title)));
+  article.append(el('p','data-note',`發布 ${time(a.publishedAt)}（台北）${/盤中|開盤|早盤|午盤|夜盤/.test(a.title)?' · 盤中報導，非前一交易日收盤':''}`));
   const points=el('ol','points');
   a.points.slice(0,3).forEach(p=>{const li=el('li','point');li.append(el('p','',plainPoint(p)));points.append(li)});
   article.append(points,copyButton(()=>articleText(a),`複製標題與${a.points.length}個重點`));container.append(article);
@@ -67,14 +69,16 @@ function dataCard({label,value,delta,date,unit='',note='',history,sourceUrl,erro
  card.append(el('p','data-date',[date,unit].filter(Boolean).join(' · ')));if(note)card.append(el('p','data-note',note));
  if(sourceUrl){const a=el('a','data-source','資料來源');a.href=sourceUrl;a.target='_blank';a.rel='noopener noreferrer';card.append(a);}return card;
 }
+const activeMarkets=()=>latestMarkets(current?.markets,dashboardData?.markets);
 function renderDashboard(){
- const root=$('dashboard-content');const markets=current?.markets||dashboardData?.markets;if(!root||!markets)return;root.replaceChildren();const tw=markets.taiwan,us=markets.us;
+ const root=$('dashboard-content');const markets=activeMarkets();if(!root||!markets)return;root.replaceChildren();const tw=markets.taiwan,us=markets.us;
+ renderMarket('taiwan',tw);renderMarket('us',us);
  const section=(title,detail,cls='')=>{const s=el('section','data-section '+cls);s.append(el('h3','',title),el('p','data-section-note',detail));const grid=el('div','data-grid');s.append(grid);root.append(s);return grid;};
  const flowReady=tw.flowPublished!==false&&(!tw.flowDate||tw.flowDate===tw.sessionDate);
  const grid=section('台股市場',`${tw.sessionDate} 收盤 · ${marketState(tw)} · 紅漲綠跌`);
  grid.append(dataCard({label:'加權指數',value:number(tw.close),delta:tw.changePct,date:tw.sessionDate,unit:'點',note:`日漲跌 ${signed(tw.change)} 點`,sourceUrl:tw.url}));
  const otc=dashboardData?.macro?.find(x=>x.id==='otc');grid.append(dataCard({label:'櫃買指數',value:otc?.status==='ok'?number(otc.value):'—',delta:otc?.status==='ok'?otc.changePct:undefined,date:otc?.date,unit:'點',note:otc?.status==='error'?'來源讀取未完成':!otc?'查詢中…':'櫃買市場',history:otc?.history,sourceUrl:otc?.sourceUrl}));
- grid.append(dataCard({label:'成交金額（上市）',value:number(tw.turnoverBillions)+' 億',date:tw.sessionDate,unit:'新臺幣',note:marketState(tw),sourceUrl:tw.url}));
+ grid.append(dataCard({label:'成交金額（上市全日）',value:number(tw.turnoverBillions)+' 億',date:tw.sessionDate,unit:'新臺幣',note:'全日統計，含ETF、權證等上市證券',sourceUrl:tw.url}));
  const breadth=dashboardData?.breadth;grid.append(dataCard({label:'上漲／下跌家數（上市股票）',value:breadth?.status==='ok'?`${breadth.advancers}／${breadth.decliners}`:'—',date:breadth?.date,note:breadth?.status==='ok'?`持平 ${breadth.unchanged} 家`:'資料查詢中或未完成',sourceUrl:breadth?.sourceUrl}));
  for(const [name,label]of [['外資','外資買賣超（上市）'],['合計','三大法人合計（上市）']]){const v=flowReady?(name==='合計'?tw.netFlowBillions:(tw.flow||[]).find(f=>f.name===name)?.value):null;grid.append(dataCard({label,value:Number.isFinite(v)?signed(v)+' 億':'待公布',date:tw.flowDate||tw.sessionDate,unit:'新臺幣',note:Number.isFinite(v)?`${v<0?'賣超':v>0?'買超':'買賣平衡'} · ${marketState(tw)}`:'法人資料待公布',sourceUrl:tw.sources?.find(x=>x.label.includes('法人'))?.url}));}
  const ug=section('美股四大指數',`${us.sessionDate} 收盤（美東） · ${marketState(us)}`,'us-cards');
@@ -92,7 +96,7 @@ async function loadDashboard(){try{const r=await fetch('/api/dashboard',{cache:'
 function render(){
  const filtered=filteredArticles();
  renderDashboard();
- renderMarket('taiwan',current.markets.taiwan);renderMarket('us',current.markets.us);
+
  for(const [key,section] of [['udn','economic'],['ctee','commercial']]){
   const items=filtered.filter(a=>a.sourceKey===key);$(section).hidden=false;
   $(section).querySelector('.section-top>span').textContent=`最近六小時 ${items.length} 篇／目標 ${ARTICLES_PER_SOURCE} 篇`;
@@ -122,7 +126,7 @@ $('refresh').addEventListener('click',refresh);
 document.addEventListener('visibilitychange',()=>{if(current)render()});
 window.addEventListener('focus',()=>{if(current)render()});
 $('focus').addEventListener('change',()=>{if(current)render()});
-$('copy').addEventListener('click',()=>copyText(reportText(current,filteredArticles()),'完整報告'));
+$('copy').addEventListener('click',()=>copyText(reportText({...current,markets:activeMarkets()},filteredArticles()),'完整報告'));
 load();
 loadDashboard();
 
